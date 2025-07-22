@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
@@ -10,8 +10,8 @@ import {
   Dimensions,
   ActivityIndicator,
 } from 'react-native';
-import { CameraView, Camera, useCameraPermissions } from 'expo-camera';
-import { BlurView } from 'expo-blur';
+import { BlurView } from 'expo-blur'; // Import BlurView as a named import
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { X, Camera as CameraIcon, Sparkles, RefreshCw } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -27,18 +27,18 @@ const { width, height } = Dimensions.get('window');
 export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScannerProps) {
   const { theme } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [scanAnimation] = useState(new Animated.Value(0));
-  const [pulseAnimation] = useState(new Animated.Value(1));
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false);
+  const [scanAnimation] = React.useState(new Animated.Value(0));
+  const [pulseAnimation] = React.useState(new Animated.Value(1));
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (visible) {
       startAnimations();
-    }
+    } else { scanAnimation.stopAnimation(); pulseAnimation.stopAnimation(); } // Fix: Use stopAnimation() instead of stop()
   }, [visible]);
 
   const startAnimations = () => {
-    // Scanning line animation
+    // Scanning line animation (looping)
     Animated.loop(
       Animated.sequence([
         Animated.timing(scanAnimation, {
@@ -54,7 +54,7 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
       ])
     ).start();
 
-    // Pulse animation for scan button
+    // Pulse animation for scan button (looping)
     Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnimation, {
@@ -105,8 +105,8 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
   }
 
   if (!permission.granted) {
-    return (
-      <Modal visible={visible} animationType="slide" transparent>
+    return visible ? ( 
+      <Modal visible={visible} animationType="slide" transparent={true}> 
         <BlurView intensity={20} style={styles.overlay}>
           <View style={[styles.permissionContainer, { backgroundColor: theme.colors.surface }]}>
             <CameraIcon size={64} color={theme.colors.textSecondary} />
@@ -117,7 +117,7 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
               We need camera access to scan your fridge and automatically identify food items using AI.
             </Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
-              <LinearGradient colors={theme.gradients.primary} style={styles.buttonGradient}>
+              <LinearGradient colors={['#22C55E', '#16A34A']} style={styles.buttonGradient}>
                 <Text style={styles.buttonText}>Grant Permission</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -127,7 +127,7 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
           </View>
         </BlurView>
       </Modal>
-    );
+    ) : null;
   }
 
   return (

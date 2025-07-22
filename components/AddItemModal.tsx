@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
@@ -9,8 +9,8 @@ import {
   ScrollView,
   Alert,
   Animated,
-  ColorValue,
 } from 'react-native';
+import { StatusBar } from 'react-native'; // Keep this import if StatusBar is used elsewhere
 import { BlurView } from 'expo-blur';
 import { LinearGradient } from 'expo-linear-gradient';
 import { X, Calendar, MapPin, Package, Hash, Scan } from 'lucide-react-native';
@@ -25,26 +25,26 @@ import { validatePantryItem, sanitizeInput } from '@/utils/validation';
 interface AddItemModalProps {
   visible: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (item: PantryItem) => void;
   editingItem?: PantryItem | null;
 }
 
 export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemModalProps) {
   const { theme } = useTheme();
-  const [name, setName] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState<UnitType>('pcs');
-  const [location, setLocation] = useState<LocationType>('Pantry');
-  const [expiryDate, setExpiryDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const [slideAnim] = useState(new Animated.Value(0));
+  const [name, setName] = React.useState('');
+  const [quantity, setQuantity] = React.useState('');
+  const [unit, setUnit] = React.useState<UnitType>('pcs');
+  const [location, setLocation] = React.useState<LocationType>('Pantry');
+  const [expiryDate, setExpiryDate] = React.useState(new Date());
+  const [showDatePicker, setShowDatePicker] = React.useState(false);
+  const [showBarcodeScanner, setShowBarcodeScanner] = React.useState(false);
+  const [slideAnim] = React.useState(new Animated.Value(0));
   const { execute: executeAsync, isLoading } = useAsyncOperation();
 
   const units: UnitType[] = ['pcs', 'g', 'kg', 'ml', 'L', 'cups', 'tbsp', 'tsp'];
   const locations: LocationType[] = ['Pantry', 'Fridge', 'Freezer'];
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (visible) {
       if (editingItem) {
         setName(editingItem.name);
@@ -52,7 +52,7 @@ export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemM
         setUnit(editingItem.unit as UnitType);
         setLocation(editingItem.location as LocationType);
         setExpiryDate(new Date(editingItem.expiryDate));
-      } else {
+      } else { 
         resetForm();
       }
       
@@ -106,7 +106,7 @@ export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemM
     }, editingItem ? 'Updating item' : 'Adding item');
 
     if (result.success) {
-      onSave();
+      onSave(itemData as PantryItem);
       onClose();
     }
   };
@@ -119,11 +119,14 @@ export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemM
   return (
     <Modal
       visible={visible}
-      animationType="none"
-      transparent
+      animationType="fade"
+      transparent={true}
+      // @ts-ignore: onRequestClose is a valid prop for Modal
       onRequestClose={onClose}
     >
-      <BlurView intensity={20} style={styles.overlay}>
+      
+        
+        <StatusBar barStyle="light-content" backgroundColor="transparent" translucent={true} /> 
         <Animated.View
           style={[
             styles.modalContainer,
@@ -287,10 +290,9 @@ export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemM
               disabled={isLoading}
             >
               <LinearGradient
-                colors={theme.gradients.primary as [ColorValue, ColorValue]}
-                start={[0, 0]}
-                end={[1, 1]}
-                locations={[0, 0.8]}
+                colors={[theme.colors.primary, theme.colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}  
                 style={styles.saveGradient}
               >
                 <Text style={styles.saveText}>
@@ -320,8 +322,8 @@ export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemM
           onClose={() => setShowBarcodeScanner(false)}
           onBarcodeScanned={handleBarcodeScanned}
         />
-      </BlurView>
-    </Modal>
+        
+      </Modal>
   );
 }
 

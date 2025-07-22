@@ -5,6 +5,7 @@ import { AppError, logError } from '@/utils/errorHandler';
 class PantryDatabaseClass {
   private db: SQLite.SQLiteDatabase | null = null;
   private isInitialized = false;
+  clearAllData: any;
 
   async init(): Promise<SQLite.SQLiteDatabase> {
     if (this.db && this.isInitialized) {

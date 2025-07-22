@@ -158,8 +158,11 @@ export function AuthModal({ visible, onClose, initialMode = 'signin' }: AuthModa
                 style={[styles.submitButton, { opacity: isLoading ? 0.7 : 1 }]}
                 onPress={handleSubmit}
                 disabled={isLoading}
-              >
-                <LinearGradient colors={theme.gradients.primary} style={styles.submitGradient}>
+                  >
+                <LinearGradient
+                  colors={[theme.colors.primary, theme.colors.secondary]}
+                  style={styles.submitGradient}
+                >   
                   <Text style={styles.submitText}>
                     {isLoading 
                       ? (mode === 'signin' ? 'Signing In...' : 'Creating Account...') 

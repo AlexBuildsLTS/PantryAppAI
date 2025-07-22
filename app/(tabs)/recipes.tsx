@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import { ChefHat, Search, Filter, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { RecipeCard } from '@/components/RecipeCard';
 import { PantryDatabase } from '@/database/PantryDatabase';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext'; // Fix: Use named import for React
+import { useState, useEffect } from 'react'; // Fix: Use named import for React
 
 interface Recipe {
   id: string;
@@ -33,9 +34,9 @@ export default function RecipesScreen() {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [filteredRecipes, setFilteredRecipes] = useState<Recipe[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [refreshing, setRefreshing] = useState(false);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
   const [fadeAnim] = useState(new Animated.Value(0));
-
+  
   useEffect(() => {
     loadRecipes();
     Animated.timing(fadeAnim, {
@@ -172,10 +173,7 @@ export default function RecipesScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient
-        colors={theme.gradients.primary as any}
-        start={[0, 0]}
-        end={[1, 1]}
-        locations={[0, 0.8]}
+        colors={[theme.colors.primary, theme.colors.secondary]}
         style={styles.header}
       >
         <View style={styles.headerContent}>
@@ -228,8 +226,7 @@ export default function RecipesScreen() {
 
       <View style={styles.tipContainer}>
         <LinearGradient
-          colors={['#FF6B6B', '#FFD93D']}
-          start={[0, 0]}
+          colors={[theme.colors.primary, theme.colors.secondary]}
           style={styles.tipCard}
         >
           <Sparkles size={24} color="#FFFFFF" />

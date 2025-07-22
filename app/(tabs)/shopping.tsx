@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,7 @@ import { Plus, ShoppingCart, Trash2, Check } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useState } from 'react';
 
 interface ShoppingItem {
   id: string;
@@ -28,7 +29,7 @@ export default function ShoppingScreen() {
   const [newItemName, setNewItemName] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
 
-  useEffect(() => {
+  React.useEffect(() => {
     loadShoppingList();
     Animated.timing(fadeAnim, {
       toValue: 1,
@@ -171,9 +172,7 @@ export default function ShoppingScreen() {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <LinearGradient
-        colors={theme.gradients.primary as any}
-        start={[0, 0]}
-        end={[1, 1]}
+        colors={[theme.colors.primary, theme.colors.secondary]}
         style={styles.header}
       >
         <View style={styles.headerContent}>

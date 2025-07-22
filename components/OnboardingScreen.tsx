@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import * as React from 'react';
 import {
   View,
+  ColorValue,
   Text,
   StyleSheet,
   Dimensions,
@@ -22,7 +23,7 @@ interface OnboardingStep {
   icon: any;
   image: string;
   gradient: string[];
-}
+} 
 
 interface OnboardingScreenProps {
   onComplete: () => void;
@@ -65,9 +66,9 @@ const onboardingSteps: OnboardingStep[] = [
 
 export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
   const { theme } = useTheme();
-  const [currentStep, setCurrentStep] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const flatListRef = useRef<any>(null);
+  const [currentStep, setCurrentStep] = React.useState(0);
+  const scrollX = React.useRef(new Animated.Value(0)).current;
+  const flatListRef = React.useRef<any>(null);
 
   const handleNext = () => {
     if (currentStep < onboardingSteps.length - 1) {
@@ -95,15 +96,18 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
             style={styles.imageOverlay}
           />
           <View style={styles.iconContainer}>
-            <LinearGradient colors={item.gradient} style={styles.iconGradient}>
+             <LinearGradient
+              colors={item.gradient as [ColorValue, ColorValue, ...ColorValue[]]}      
+
+              style={styles.iconGradient}
+            >
               <Icon size={32} color="#FFFFFF" />
             </LinearGradient>
           </View>
         </View>
-        
         <View style={styles.contentContainer}>
           <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
-            {item.title}
+            {item.title} 
           </Text>
           <Text style={[styles.stepDescription, { color: theme.colors.textSecondary }]}>
             {item.description}
@@ -112,6 +116,11 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       </View>
     );
   };
+
+  const handleScroll = Animated.event<any>(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } as const }],
+    { useNativeDriver: false }
+  );
 
   const renderPagination = () => {
     return (
@@ -164,13 +173,14 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
         </TouchableOpacity>
       </View>
 
+   
       <Animated.FlatList
-        ref={flatListRef}
+        
         data={onboardingSteps}
         renderItem={renderStep}
         keyExtractor={(item) => item.id}
-        horizontal
-        pagingEnabled
+        horizontal={true}
+        pagingEnabled={true}
         showsHorizontalScrollIndicator={false}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
@@ -187,8 +197,9 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
       <View style={styles.footer}>
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <LinearGradient
-            colors={onboardingSteps[currentStep].gradient}
-            style={styles.nextButtonGradient}
+            colors={onboardingSteps[currentStep].gradient as [ColorValue, ColorValue, ...ColorValue[]]}
+            style={styles.nextButtonGradient
+            }
           >
             <Text style={styles.nextButtonText}>
               {currentStep === onboardingSteps.length - 1 ? 'Get Started' : 'Next'}
@@ -197,7 +208,7 @@ export function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
           </LinearGradient>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </SafeAreaView> 
   );
 }
 

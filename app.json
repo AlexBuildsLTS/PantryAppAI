@@ -7,17 +7,35 @@
     "icon": "./assets/images/icon.png",
     "scheme": "pantrypal",
     "userInterfaceStyle": "automatic",
-    "description": "AI-powered smart food inventory management app",
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#22C55E"
+    },
+    "newArchEnabled": true,
+    "description": "AI-powered smart food inventory management app that helps reduce waste and save money",
+    "keywords": ["food", "inventory", "AI", "pantry", "expiration", "waste reduction"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.pantrypal.app",
-      "buildNumber": "1"
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses camera to scan and identify food items using AI",
+        "NSMicrophoneUsageDescription": "This app may use microphone for video recording during food scanning",
+        "NSNotificationsUsageDescription": "This app sends notifications to remind you about expiring food items"
+      }
     },
     "android": {
       "package": "com.pantrypal.app",
       "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "WRITE_EXTERNAL_STORAGE",
+        "NOTIFICATIONS",
+        "VIBRATE"
+      ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#22C55E"
       }
     },
@@ -28,10 +46,20 @@
     },
     "plugins": [
       "expo-router",
-      "expo-font"
+      "expo-font",
+      "expo-web-browser",
+      "expo-camera",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#22C55E"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "privacy": "public"
   }
 }

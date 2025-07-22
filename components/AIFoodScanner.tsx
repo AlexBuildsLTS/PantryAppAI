@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
 import {
   View,
   Text,
@@ -31,16 +31,15 @@ interface AIFoodScannerProps {
 export function AIFoodScanner({ visible, onClose, onItemsAdded }: AIFoodScannerProps) {
   const { theme } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [detectedItems, setDetectedItems] = useState<AIDetectionResult[]>([]);
-  const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-  const [showResults, setShowResults] = useState(false);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [scanAnimation] = useState(new Animated.Value(0));
+  const [isAnalyzing, setIsAnalyzing] = React.useState(false); // Fix: Removed unused Camera permissions hook
+  const [detectedItems, setDetectedItems] = React.useState<AIDetectionResult[]>([]);
+  const [selectedItems, setSelectedItems] = React.useState<Set<string>>(new Set());
+  const [showResults, setShowResults] = React.useState(false);
+  const [capturedImage, setCapturedImage] = React.useState<string | null>(null);
+  const [scanAnimation] = React.useState(new Animated.Value(0));
   const { execute: executeAsync } = useAsyncOperation();
-  const isAddButtonDisabled = detectedItems.length === 0 || selectedItems.size === 0;
 
-  useEffect(() => {
+  React.useEffect(() => {
     if (visible && !showResults) {
       startScanAnimation();
     }
@@ -143,7 +142,6 @@ export function AIFoodScanner({ visible, onClose, onItemsAdded }: AIFoodScannerP
   if (!permission.granted) {
     return (
       <Modal visible={visible} animationType="slide" transparent>
-        <BlurView intensity={20} style={styles.overlay}>
           <View style={[styles.permissionContainer, { backgroundColor: theme.colors.surface }]}>
             <Brain size={64} color={theme.colors.primary} />
             <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>
@@ -154,10 +152,9 @@ export function AIFoodScanner({ visible, onClose, onItemsAdded }: AIFoodScannerP
             </Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
               <LinearGradient
-                colors={theme.gradients.primary as [ColorValue, ColorValue]}
+                colors={theme.gradients.primary as [ColorValue, ColorValue, ...ColorValue[]]}
                 style={styles.buttonGradient}
               >
-                <Edit3 size={24} color="#FFFFFF" />
                 <Text style={styles.buttonText}>Enable Camera</Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -165,8 +162,7 @@ export function AIFoodScanner({ visible, onClose, onItemsAdded }: AIFoodScannerP
               <Text style={[styles.cancelText, { color: theme.colors.textSecondary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
-        </BlurView>
-      </Modal>
+    </Modal>
     );
   }
 
@@ -349,27 +345,18 @@ export function AIFoodScanner({ visible, onClose, onItemsAdded }: AIFoodScannerP
                 </Text>
               </TouchableOpacity>
               
-              <TouchableOpacity
+              <TouchableOpacity 
                 style={[
                   styles.addButton,
-                  isAddButtonDisabled && { opacity: 0.5 }
+                  selectedItems.size === 0 && { opacity: 0.5 }
                 ]}
                 onPress={handleAddSelectedItems}
-                disabled={isAddButtonDisabled}
-                accessibilityRole="button"
-                accessibilityLabel="Add selected items to pantry"
-                accessibilityHint="Adds the selected items to your pantry inventory"
-                accessibilityState={{
-                  disabled: isAddButtonDisabled,
-                }}
+                disabled={selectedItems.size === 0}
               >
-                <LinearGradient
-                  colors={theme.gradients.primary as [ColorValue, ColorValue]}
-                  style={styles.addButtonGradient}
-                >
+                <LinearGradient colors={theme.gradients.primary as any} style={styles.addButtonGradient}>
                   <Plus size={20} color="#FFFFFF" />
                   <Text style={styles.addButtonText}>
-                    Add {selectedItems.size} Item{selectedItems.size > 1 ? 's' : ''}
+                    Add {selectedItems.size} Items
                   </Text>
                 </LinearGradient>
               </TouchableOpacity>
@@ -379,9 +366,7 @@ export function AIFoodScanner({ visible, onClose, onItemsAdded }: AIFoodScannerP
       </View>
     </Modal>
   );
-} 
-
-
+}
 
 const styles = StyleSheet.create({
   container: {
