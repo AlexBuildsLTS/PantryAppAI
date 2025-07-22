@@ -8,6 +8,12 @@
       "distribution": "internal",
       "ios": {
         "resourceClass": "m1-medium"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "http://192.168.1.100:8081"
       }
     },
     "preview": {
@@ -17,14 +23,25 @@
       },
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://staging.api.pantrypal.com"
       }
     },
     "production": {
+      "cache": {
+        "key": "v1"
+      },
       "ios": {
         "resourceClass": "m1-medium"
       },
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.pantrypal.com",
+        "EXPO_PUBLIC_SENTRY_DSN": "your_sentry_dsn",
+        "EXPO_PUBLIC_ANALYTICS_ID": "your_analytics_id"
       }
     }
   },
