@@ -4,11 +4,10 @@ const { getDefaultConfig } = require('expo/metro-config');
 /** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
 
-// 1. Enable support for `.db` files for expo-sqlite
-config.resolver.assetExts.push('db');
+// 1. Enable support for SQLite databases and WebAssembly modules.
+config.resolver.assetExts.push('db', 'wasm');
 
-// 2. Enable support for `mjs` and `wasm` files for Metro.
+// 2. Enable support for `mjs` files for Metro.
 config.resolver.sourceExts.push('mjs');
-config.resolver.sourceExts.push('wasm');
 
 module.exports = config;

@@ -1,6 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { TriangleAlert as AlertTriangle, RefreshCw } from 'lucide-react-native';
+import { Feather } from '@expo/vector-icons';
 
 interface Props {
   children: ReactNode;
@@ -24,7 +24,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
-    // In production, send to crash reporting service
   }
 
   handleRetry = () => {
@@ -39,13 +38,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
       return (
         <View style={styles.container}>
-          <AlertTriangle size={64} color="#EF4444" />
+          <Feather name="alert-triangle" size={64} color="#EF4444" />
           <Text style={styles.title}>Something went wrong</Text>
           <Text style={styles.message}>
             {this.state.error?.message || 'An unexpected error occurred'}
           </Text>
           <TouchableOpacity style={styles.retryButton} onPress={this.handleRetry}>
-            <RefreshCw size={20} color="#FFFFFF" />
+            <Feather name="refresh-cw" size={20} color="#FFFFFF" />
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
         </View>
