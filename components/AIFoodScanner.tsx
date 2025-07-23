@@ -7,9 +7,9 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { AIService } from '@/services/AIService';
 import { PantryDatabase } from '@/database/PantryDatabase';
 import { AIDetectionResult } from '@/types';
-import { useTheme } from '@/contexts/ThemeContext';
+import { useTheme } from '@/contexts/ThemeContext'; // Fix: Remove unused import
 import { useAsyncOperation } from '@/hooks/useAsyncOperation';
-import { SafeAreaView } from 'react-native-safe-area-context/lib/typescript/src/SafeAreaView';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 interface AIFoodScannerProps { visible: boolean; onClose: () => void; onItemsAdded: () => void; }
 
