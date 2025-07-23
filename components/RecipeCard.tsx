@@ -7,9 +7,9 @@ import {
   Image,
   Animated,
   Dimensions,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Clock, Users, ChefHat, Star } from 'lucide-react-native';
+} from "react-native";
+import { LinearGradient } from "expo-linear-gradient"; // Import LinearGradient
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons"; // Import Feather and MaterialCommunityIcons
 
 interface Recipe {
   id: string;
@@ -93,23 +93,23 @@ export function RecipeCard({ recipe, onPress }: RecipeCardProps) {
 
             <View style={styles.stats}>
               <View style={styles.statItem}>
-                <Clock size={16} color="#6B7280" />
+                <Feather name="clock" size={16} color="#6B7280" />
                 <Text style={styles.statText}>{recipe.cookTime}m</Text>
               </View>
               <View style={styles.statItem}>
-                <Users size={16} color="#6B7280" />
+                <Feather name="users" size={16} color="#6B7280" />
                 <Text style={styles.statText}>{recipe.servings}</Text>
               </View>
               <View style={styles.statItem}>
-                <ChefHat size={16} color={getDifficultyColor(recipe.difficulty)} />
+                <MaterialCommunityIcons name="chef-hat" size={16} color={getDifficultyColor(recipe.difficulty)} />
                 <Text style={[styles.statText, { color: getDifficultyColor(recipe.difficulty) }]}>
                   {recipe.difficulty}
                 </Text>
               </View>
               <View style={styles.statItem}>
-                <Star size={16} color="#F59E0B" />
+                <Feather name="star" size={16} color="#F59E0B" />
                 <Text style={styles.statText}>{recipe.rating}</Text>
-              </View>
+              </View> 
             </View>
 
             <View style={styles.ingredients}>

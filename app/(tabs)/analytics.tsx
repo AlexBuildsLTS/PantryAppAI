@@ -7,8 +7,8 @@ import {
   Dimensions,
   Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChartBar as BarChart3, TrendingUp, TrendingDown, DollarSign, Leaf, Calendar, Package, TriangleAlert as AlertTriangle } from 'lucide-react-native';
+import { SafeAreaView } from 'react-native-safe-area-context'; // Fix: Remove unused import
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'; // Fix: Import icons from @expo/vector-icons
 import { LinearGradient } from 'expo-linear-gradient';
 import { PantryDatabase } from '@/database/PantryDatabase';
 import { PantryItem } from '@/types/PantryItem';
@@ -141,10 +141,10 @@ export default function AnalyticsScreen() {
         </View>
         {trend && (
           <View style={styles.trendContainer}>
-            {trend === 'up' ? (
-              <TrendingUp size={16} color="#22C55E" />
+            {trend === 'up' ? ( // Fix: Use Feather icon for trending up
+              <Feather name="trending-up" size={16} color="#22C55E" />
             ) : (
-              <TrendingDown size={16} color="#EF4444" />
+              <Feather name="trending-down" size={16} color="#EF4444" />
             )}
           </View>
         )}
@@ -211,7 +211,7 @@ export default function AnalyticsScreen() {
         style={styles.header}
       >
         <View style={styles.headerContent}>
-          <BarChart3 size={32} color="#FFFFFF" />
+          <Feather name="bar-chart-2" size={32} color="#FFFFFF" />
           <Text style={styles.headerTitle}>Analytics</Text>
           <Text style={styles.headerSubtitle}>
             Insights into your food management
@@ -228,7 +228,7 @@ export default function AnalyticsScreen() {
             title="Total Items"
             value={analytics.totalItems.toString()}
             subtitle="In your pantry"
-            icon={Package}
+            icon={Feather}
             color={theme.colors.success}
             trend="up"
           />
@@ -236,14 +236,14 @@ export default function AnalyticsScreen() {
             title="Expiring Soon"
             value={analytics.expiringItems.toString()}
             subtitle="Next 3 days"
-            icon={AlertTriangle}
+            icon={Feather}
             color={theme.colors.warning}
           />
           <StatCard
             title="Estimated Value"
             value={`$${analytics.estimatedValue.toFixed(0)}`}
             subtitle="Current inventory"
-            icon={DollarSign}
+            icon={Feather}
             color={theme.colors.secondary}
             trend="up"
           />
@@ -251,7 +251,7 @@ export default function AnalyticsScreen() {
             title="Waste Reduction"
             value={`${analytics.wasteReduction.toFixed(0)}%`}
             subtitle="vs. average household"
-            icon={Leaf}
+            icon={Feather}
             color={theme.colors.success}
             trend="up"
           />
@@ -299,7 +299,7 @@ export default function AnalyticsScreen() {
         <View style={styles.insightsContainer}>
           <Text style={styles.sectionTitle}>Insights</Text>
           <View style={[styles.insightCard, { backgroundColor: theme.colors.surface }]}>
-            <Leaf size={24} color={theme.colors.success} />
+            <MaterialCommunityIcons name="leaf" size={24} color={theme.colors.success} />
             <View style={styles.insightContent}>
               <Text style={[styles.insightTitle, { color: theme.colors.text }]}>Great job reducing waste!</Text>
               <Text style={[styles.insightText, { color: theme.colors.textSecondary }]}>
@@ -310,7 +310,7 @@ export default function AnalyticsScreen() {
           
           {analytics.expiringItems > 0 && (
             <View style={[styles.insightCard, { backgroundColor: theme.colors.surface }]}>
-              <AlertTriangle size={24} color={theme.colors.warning} />
+              <Feather name="alert-triangle" size={24} color={theme.colors.warning} />
               <View style={styles.insightContent}>
                 <Text style={[styles.insightTitle, { color: theme.colors.text }]}>Items expiring soon</Text>
                 <Text style={[styles.insightText, { color: theme.colors.textSecondary }]}>

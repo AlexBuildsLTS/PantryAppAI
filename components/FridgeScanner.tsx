@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { BlurView } from 'expo-blur'; // Import BlurView as a named import
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { X, Camera as CameraIcon, Sparkles, RefreshCw } from 'lucide-react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -109,7 +109,7 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
       <Modal visible={visible} animationType="slide" transparent={true}> 
         <BlurView intensity={20} style={styles.overlay}>
           <View style={[styles.permissionContainer, { backgroundColor: theme.colors.surface }]}>
-            <CameraIcon size={64} color={theme.colors.textSecondary} />
+            <Feather name="camera" size={64} color={theme.colors.textSecondary} />
             <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>
               Camera Permission Required
             </Text>
@@ -136,8 +136,8 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
         <CameraView style={styles.camera}>
           <View style={styles.overlay}>
             <View style={styles.header}>
-              <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-                <X size={24} color="#FFFFFF" />
+              <TouchableOpacity style={styles.closeButton} onPress={onClose}> 
+                <Feather name="x" size={24} color="#FFFFFF" />
               </TouchableOpacity>
               <Text style={styles.title}>AI Fridge Scanner</Text>
               <View style={styles.placeholder} />
@@ -178,7 +178,7 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
             </View>
 
             <View style={styles.instructions}>
-              <Sparkles size={24} color="#22C55E" />
+              <MaterialCommunityIcons name="fridge" size={64} color="#FFFFFF" />'
               <Text style={styles.instructionText}>
                 Position your fridge contents in the frame
               </Text>
@@ -198,12 +198,12 @@ export function FridgeScanner({ visible, onClose, onItemsDetected }: FridgeScann
                     colors={isAnalyzing ? ['#9CA3AF', '#6B7280'] : ['#22C55E', '#16A34A']}
                     style={styles.scanButtonGradient}
                   >
-                    {isAnalyzing ? (
-                      <RefreshCw size={28} color="#FFFFFF" />
+                    {isAnalyzing ? ( 
+                      <Feather name="refresh-cw" size={28} color="#FFFFFF" />
                     ) : (
-                      <Sparkles size={28} color="#FFFFFF" />
+                      <MaterialCommunityIcons name="camera" size={28} color="#FFFFFF" />
                     )}
-                  </LinearGradient>
+                  </LinearGradient> 
                 </TouchableOpacity>
               </Animated.View>
             </View>

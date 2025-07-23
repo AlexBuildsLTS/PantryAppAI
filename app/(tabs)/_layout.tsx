@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { ShoppingCart, Package, Bell, Settings, ChefHat, BarChart3 } from 'lucide-react-native';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function TabLayout() {
@@ -29,8 +29,8 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Pantry',
-          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
-            <Package size={size} color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Feather name="package" size={24} color={color} />
           ),
         }}
       />
@@ -38,8 +38,8 @@ export default function TabLayout() {
         name="shopping"
         options={{ 
           title: 'Shopping',
-          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
-            <ShoppingCart size={size} color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Feather name="shopping-cart" size={24} color={color} />
           ),
         }}
       />
@@ -47,8 +47,8 @@ export default function TabLayout() {
         name="recipes"
         options={{ 
           title: 'Recipes',
-          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
-            <ChefHat size={size} color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <MaterialCommunityIcons name="chef-hat" size={24} color={color} />
           ),
         }}
       />
@@ -56,8 +56,8 @@ export default function TabLayout() {
         name="analytics"
         options={{ 
           title: 'Analytics',
-          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
-            <BarChart3 size={size} color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Feather name="bar-chart-2" size={24} color={color} />
           ),
         }}
       />
@@ -65,8 +65,8 @@ export default function TabLayout() {
         name="notifications"
         options={{
           title: 'Alerts', 
-          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
-            <Bell size={size} color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Feather name="bell" size={24} color={color} />
           ),
         }}
       />
@@ -74,8 +74,8 @@ export default function TabLayout() {
         name="settings"
         options={{
           title: 'Settings',
-          tabBarIcon: ({ size, color }: { size: number; color: string }) => (
-            <Settings size={size} color={color} />
+          tabBarIcon: ({ color }: { color: string }) => (
+            <Feather name="settings" size={24} color={color} />
           ),
         }}
       />
