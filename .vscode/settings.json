@@ -11,5 +11,6 @@
   "prettier.printWidth": 80,
   "prettier.proseWrap": "preserve",
   "prettier.endOfLine": "lf",
-  "prettier.insertPragma": false
+  "prettier.insertPragma": false,
+  "jigx.isJigxUser": false
 }
