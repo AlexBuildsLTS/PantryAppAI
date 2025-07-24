@@ -8,6 +8,7 @@ import {
   Animated,
   RefreshControl,
   SafeAreaView,
+  TextInput,
 } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -15,7 +16,6 @@ import { RecipeCard } from '@/components/RecipeCard';
 import { PantryDatabase } from '@/database/PantryDatabase';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Recipe } from '@/types';
-import { TextInput } from 'react-native/Libraries/Components/TextInput/TextInput';
 
 export default function RecipesScreen() {
   const { theme } = useTheme();

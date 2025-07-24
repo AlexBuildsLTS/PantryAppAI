@@ -10,4 +10,4 @@ config.resolver.assetExts.push('db', 'wasm');
 // 2. Enable support for `mjs` files for Metro.
 config.resolver.sourceExts.push('mjs');
 
-module.exports = config;
+module.exports = config; 
