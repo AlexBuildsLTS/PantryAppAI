@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TouchableOpacity, StyleSheet, Alert, Animated } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, StyleSheet, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { BlurView } from 'expo-blur';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,7 +20,7 @@ export function BarcodeScanner({ visible, onClose, onBarcodeScanned }: BarcodeSc
 
   useEffect(() => {
     if (visible) {
-      setScanned(false); // Reset on open
+      setScanned(false);
       startScanAnimation();
     }
   }, [visible]);
@@ -49,15 +49,13 @@ export function BarcodeScanner({ visible, onClose, onBarcodeScanned }: BarcodeSc
           <View style={styles.permissionContainer}>
             <MaterialCommunityIcons name="barcode-scan" size={64} color="#6B7280" />
             <Text style={styles.permissionTitle}>Camera Permission Required</Text>
-            <Text style={styles.permissionText}>We need camera access to scan barcodes and quickly add items to your pantry.</Text>
+            <Text style={styles.permissionText}>We need camera access to scan barcodes.</Text>
             <TouchableOpacity style={styles.permissionButton} onPress={requestPermission}>
               <LinearGradient colors={['#22C55E', '#16A34A']} style={styles.buttonGradient}>
                 <Text style={styles.buttonText}>Grant Permission</Text>
               </LinearGradient>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
+            <TouchableOpacity style={styles.cancelButton} onPress={onClose}><Text style={styles.cancelText}>Cancel</Text></TouchableOpacity>
           </View>
         </BlurView>
       </Modal>
@@ -67,29 +65,18 @@ export function BarcodeScanner({ visible, onClose, onBarcodeScanned }: BarcodeSc
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
-        <CameraView
-          style={styles.camera}
-          onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
-          enableTorch={flashEnabled}
-          barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "qr", "upc_a", "upc_e"] }}
-        >
+        <CameraView style={styles.camera} onBarcodeScanned={scanned ? undefined : handleBarCodeScanned} enableTorch={flashEnabled} barcodeScannerSettings={{ barcodeTypes: ["ean13", "ean8", "qr", "upc_a", "upc_e"] }}>
           <View style={styles.overlay}>
             <View style={styles.header}>
-              <TouchableOpacity style={styles.iconButton} onPress={onClose}>
-                <Feather name="x" size={24} color="#FFFFFF" />
-              </TouchableOpacity>
+              <TouchableOpacity style={styles.iconButton} onPress={onClose}><Feather name="x" size={24} color="#FFFFFF" /></TouchableOpacity>
               <Text style={styles.title}>Scan Barcode</Text>
               <TouchableOpacity style={styles.iconButton} onPress={() => setFlashEnabled(!flashEnabled)}>
                 {flashEnabled ? <Feather name="zap-off" size={24} color="#FFFFFF" /> : <Feather name="zap" size={24} color="#FFFFFF" />}
               </TouchableOpacity>
             </View>
-
             <View style={styles.scanArea}>
               <View style={styles.scanFrame}>
-                <View style={[styles.corner, styles.topLeft]} />
-                <View style={[styles.corner, styles.topRight]} />
-                <View style={[styles.corner, styles.bottomLeft]} />
-                <View style={[styles.corner, styles.bottomRight]} />
+                <View style={[styles.corner, styles.topLeft]} /><View style={[styles.corner, styles.topRight]} /><View style={[styles.corner, styles.bottomLeft]} /><View style={[styles.corner, styles.bottomRight]} />
                 <Animated.View style={[ styles.scanLine, { transform: [{ translateY: scanAnimation.interpolate({ inputRange: [0, 1], outputRange: [-10, 240] }) }] } ]} />
               </View>
             </View>

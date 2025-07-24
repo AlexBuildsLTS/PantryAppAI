@@ -5,13 +5,11 @@ import { AppError, logError } from '@/utils/errorHandler';
 class PantryDatabaseClass {
   private db: SQLite.SQLiteDatabase | null = null;
   private isInitialized = false;
-  clearAllData: any;
 
   async init(): Promise<SQLite.SQLiteDatabase> {
     if (this.db && this.isInitialized) {
       return this.db;
     }
-
     try {
       this.db = await SQLite.openDatabaseAsync('pantrypal.db');
       await this.createTables();
@@ -25,23 +23,19 @@ class PantryDatabaseClass {
 
   private async createTables(): Promise<void> {
     if (!this.db) throw new AppError('Database not initialized');
-
     try {
       await this.db.execAsync(`
+        PRAGMA journal_mode = WAL;
         CREATE TABLE IF NOT EXISTS pantry_items (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT NOT NULL CHECK(length(name) > 0),
           quantity REAL NOT NULL CHECK(quantity > 0),
-          unit TEXT NOT NULL CHECK(length(unit) > 0),
-          location TEXT NOT NULL CHECK(length(location) > 0),
+          unit TEXT NOT NULL,
+          location TEXT NOT NULL,
           expiryDate TEXT NOT NULL,
           createdAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           updatedAt TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        
-        CREATE INDEX IF NOT EXISTS idx_pantry_items_expiry ON pantry_items(expiryDate);
-        CREATE INDEX IF NOT EXISTS idx_pantry_items_location ON pantry_items(location);
-        CREATE INDEX IF NOT EXISTS idx_pantry_items_name ON pantry_items(name);
       `);
     } catch (error) {
       logError(error, 'Table creation');
@@ -53,17 +47,11 @@ class PantryDatabaseClass {
     try {
       const db = await this.init();
       const now = new Date().toISOString();
-      
       const result = await db.runAsync(
-        `INSERT INTO pantry_items (name, quantity, unit, location, expiryDate, createdAt, updatedAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        'INSERT INTO pantry_items (name, quantity, unit, location, expiryDate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
         [item.name, item.quantity, item.unit, item.location, item.expiryDate, now, now]
       );
-      
-      if (!result.lastInsertRowId) {
-        throw new AppError('Failed to insert item');
-      }
-      
+      if (!result.lastInsertRowId) throw new AppError('Failed to insert item');
       return result.lastInsertRowId;
     } catch (error) {
       logError(error, 'Adding pantry item');
@@ -71,21 +59,33 @@ class PantryDatabaseClass {
     }
   }
 
+  async addItems(items: Omit<PantryItem, 'id' | 'createdAt' | 'updatedAt'>[]): Promise<void> {
+    try {
+      const db = await this.init();
+      const now = new Date().toISOString();
+      await db.withTransactionAsync(async () => {
+        for (const item of items) {
+          await db.runAsync(
+            'INSERT INTO pantry_items (name, quantity, unit, location, expiryDate, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [item.name, item.quantity, item.unit, item.location, item.expiryDate, now, now]
+          );
+        }
+      });
+    } catch (error) {
+      logError(error, 'Batch adding pantry items');
+      throw new AppError('Failed to add multiple items to pantry');
+    }
+  }
+
   async updateItem(id: number, item: Omit<PantryItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> {
     try {
       const db = await this.init();
       const now = new Date().toISOString();
-      
       const result = await db.runAsync(
-        `UPDATE pantry_items 
-         SET name = ?, quantity = ?, unit = ?, location = ?, expiryDate = ?, updatedAt = ?
-         WHERE id = ?`,
+        'UPDATE pantry_items SET name = ?, quantity = ?, unit = ?, location = ?, expiryDate = ?, updatedAt = ? WHERE id = ?',
         [item.name, item.quantity, item.unit, item.location, item.expiryDate, now, id]
       );
-      
-      if (result.changes === 0) {
-        throw new AppError('Item not found');
-      }
+      if (result.changes === 0) throw new AppError('Item not found for update');
     } catch (error) {
       logError(error, 'Updating pantry item');
       throw new AppError('Failed to update item');
@@ -96,10 +96,7 @@ class PantryDatabaseClass {
     try {
       const db = await this.init();
       const result = await db.runAsync('DELETE FROM pantry_items WHERE id = ?', [id]);
-      
-      if (result.changes === 0) {
-        throw new AppError('Item not found');
-      }
+      if (result.changes === 0) throw new AppError('Item not found for deletion');
     } catch (error) {
       logError(error, 'Deleting pantry item');
       throw new AppError('Failed to delete item');
@@ -117,59 +114,16 @@ class PantryDatabaseClass {
     }
   }
 
-  async getItemsByLocation(location: string): Promise<PantryItem[]> {
+  async clearAllData(): Promise<void> {
     try {
-      const db = await this.init();
-      const result = await db.getAllAsync(
-        'SELECT * FROM pantry_items WHERE location = ? ORDER BY expiryDate ASC',
-        [location]
-      );
-      return result as PantryItem[];
+        const db = await this.init();
+        await db.withTransactionAsync(async () => {
+            await db.execAsync('DROP TABLE IF EXISTS pantry_items;');
+            await this.createTables();
+        });
     } catch (error) {
-      logError(error, 'Getting items by location');
-      throw new AppError('Failed to load items by location');
-    }
-  }
-
-  async getExpiringItems(days: number = 3): Promise<PantryItem[]> {
-    try {
-      const db = await this.init();
-      const targetDate = new Date();
-      targetDate.setDate(targetDate.getDate() + days);
-      
-      const result = await db.getAllAsync(
-        'SELECT * FROM pantry_items WHERE expiryDate <= ? ORDER BY expiryDate ASC',
-        [targetDate.toISOString()]
-      );
-      return result as PantryItem[];
-    } catch (error) {
-      logError(error, 'Getting expiring items');
-      throw new AppError('Failed to load expiring items');
-    }
-  }
-
-  async searchItems(query: string): Promise<PantryItem[]> {
-    try {
-      const db = await this.init();
-      const result = await db.getAllAsync(
-        'SELECT * FROM pantry_items WHERE name LIKE ? ORDER BY name ASC',
-        [`%${query}%`]
-      );
-      return result as PantryItem[];
-    } catch (error) {
-      logError(error, 'Searching items');
-      throw new AppError('Failed to search items');
-    }
-  }
-
-  async getItemCount(): Promise<number> {
-    try {
-      const db = await this.init();
-      const result = await db.getFirstAsync('SELECT COUNT(*) as count FROM pantry_items') as { count: number };
-      return result.count;
-    } catch (error) {
-      logError(error, 'Getting item count');
-      return 0;
+        logError(error, 'Clearing all data');
+        throw new AppError('Failed to clear all data');
     }
   }
 }
