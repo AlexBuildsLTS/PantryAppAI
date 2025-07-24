@@ -19,6 +19,7 @@
 ## ✨ Core Features
 
 ### 🤖 **AI-Powered Food Recognition**
+
 - **Smart Camera Scanner**: Point your camera at your fridge/pantry and let AI identify multiple items instantly
 - **Advanced Detection**: Recognizes 1000+ food items with confidence scoring
 - **Bulk Addition**: Add multiple detected items with a single tap
@@ -26,6 +27,7 @@
 - **Real-time Processing**: Instant food recognition with visual feedback
 
 ### 📱 **Complete Mobile Experience**
+
 - **Cross-Platform**: Native iOS and Android apps built with React Native
 - **Offline-First**: Works without internet connection
 - **Cloud Sync**: Seamless data synchronization across all devices
@@ -33,6 +35,7 @@
 - **Dark/Light Themes**: Beautiful themes that adapt to your preference
 
 ### 🏠 **Smart Inventory Management**
+
 - **Multi-Location Tracking**: Organize items by Pantry, Fridge, and Freezer
 - **Expiration Monitoring**: Color-coded alerts (Fresh/Expiring/Expired)
 - **Quantity Tracking**: Monitor amounts with flexible units
@@ -40,12 +43,14 @@
 - **Manual Entry**: Traditional input with smart suggestions
 
 ### 🔔 **Intelligent Notifications**
+
 - **Expiration Alerts**: Customizable reminders before items expire
 - **Shopping Reminders**: Smart suggestions for restocking
 - **Weekly Reports**: Analytics summaries delivered to your device
 - **Background Processing**: Automatic monitoring even when app is closed
 
 ### 👤 **User Accounts & Sync**
+
 - **Secure Authentication**: Email/password registration and login
 - **Profile Management**: Customize your experience and preferences
 - **Cross-Device Sync**: Access your pantry from any device
@@ -57,18 +62,21 @@
 ## 🚀 Advanced Features
 
 ### 🍳 **Recipe Intelligence**
+
 - **Smart Suggestions**: AI-powered recipe recommendations based on available ingredients
 - **Ingredient Matching**: Shows percentage of ingredients you already have
 - **Cooking Instructions**: Step-by-step recipes with nutritional information
 - **Difficulty Ratings**: Easy to Hard classification system
 
 ### 🛒 **Smart Shopping Lists**
+
 - **Auto-Generation**: Create shopping lists from low inventory
 - **Completion Tracking**: Check off items as you shop
 - **Smart Suggestions**: Recommendations based on usage patterns
 - **Shared Lists**: Collaborate with family members
 
 ### 📊 **Analytics & Insights**
+
 - **Waste Reduction Tracking**: Monitor your environmental impact
 - **Spending Analysis**: Track food budget and inventory value
 - **Usage Patterns**: Understand your consumption habits
@@ -76,6 +84,7 @@
 - **Location Breakdown**: See distribution across storage areas
 
 ### 🌐 **Social & Sharing**
+
 - **Achievement System**: Unlock badges for waste reduction milestones
 - **Social Sharing**: Share your sustainability achievements
 - **Community Features**: Connect with other eco-conscious users
@@ -86,6 +95,7 @@
 ## 🛠️ Technical Architecture
 
 ### **Frontend Stack**
+
 ```typescript
 - React Native 0.79.1 (Latest)
 - Expo SDK 53 (Managed Workflow)
@@ -98,6 +108,7 @@
 ```
 
 ### **AI & Machine Learning**
+
 ```typescript
 - OpenAI GPT-4 Vision (Food Recognition)
 - Google Cloud Vision API (Alternative)
@@ -108,6 +119,7 @@
 ```
 
 ### **Backend Services**
+
 ```typescript
 - Expo Notifications (Push Notifications)
 - AsyncStorage (Local Persistence)
@@ -117,6 +129,7 @@
 ```
 
 ### **Development Tools**
+
 ```typescript
 - Expo CLI (Development Environment)
 - EAS Build (Cloud Building)
@@ -130,18 +143,21 @@
 ## 📱 Screenshots & Demo
 
 ### Main Dashboard
+
 <div align="center">
   <img src="https://images.pexels.com/photos/4099354/pexels-photo-4099354.jpeg" alt="Dashboard" width="250">
   <p><em>Clean, intuitive dashboard with real-time inventory status</em></p>
 </div>
 
 ### AI Food Scanner
+
 <div align="center">
   <img src="https://images.pexels.com/photos/4198019/pexels-photo-4198019.jpeg" alt="AI Scanner" width="250">
   <p><em>Advanced AI camera scanner with real-time food detection</em></p>
 </div>
 
 ### Analytics Dashboard
+
 <div align="center">
   <img src="https://images.pexels.com/photos/6347919/pexels-photo-6347919.jpeg" alt="Analytics" width="250">
   <p><em>Comprehensive analytics showing waste reduction and savings</em></p>
@@ -152,12 +168,14 @@
 ## 🚀 Quick Start Guide
 
 ### **Prerequisites**
+
 - Node.js 18+ installed
 - Expo CLI installed globally
 - iOS Simulator (Mac) or Android Emulator
 - Physical device for camera testing
 
 ### **Installation**
+
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/pantry-pal.git
@@ -171,11 +189,13 @@ npm run dev
 ```
 
 ### **AI Configuration (Optional)**
+
 1. Get API key from OpenAI, Google Cloud Vision, or AWS
 2. Open app → Settings → AI Features → AI API Key
 3. Enter your API key for enhanced food recognition
 
 ### **Testing**
+
 ```bash
 # Run on iOS Simulator
 npm run ios
@@ -195,6 +215,7 @@ npm run dev
 ### **📱 iOS App Store Deployment**
 
 #### **Prerequisites**
+
 - Apple Developer Account ($99/year)
 - Mac computer with Xcode
 - EAS CLI installed: `npm install -g @expo/eas-cli`
@@ -202,6 +223,7 @@ npm run dev
 #### **Step-by-Step iOS Deployment**
 
 1. **Configure App Credentials**
+
 ```bash
 # Login to Expo
 eas login
@@ -214,6 +236,7 @@ eas credentials
 ```
 
 2. **Update App Configuration**
+
 ```json
 // app.json
 {
@@ -235,6 +258,7 @@ eas credentials
 ```
 
 3. **Build for iOS**
+
 ```bash
 # Create production build
 eas build --platform ios --profile production
@@ -244,6 +268,7 @@ eas build --platform ios --profile production
 ```
 
 4. **Submit to App Store**
+
 ```bash
 # Submit directly to App Store
 eas submit --platform ios
@@ -252,6 +277,7 @@ eas submit --platform ios
 ```
 
 5. **App Store Connect Setup**
+
 - Login to [App Store Connect](https://appstoreconnect.apple.com)
 - Create new app with same bundle identifier
 - Fill out app information, screenshots, description
@@ -259,6 +285,7 @@ eas submit --platform ios
 - Submit for review (1-7 days)
 
 #### **iOS App Store Requirements**
+
 - **Screenshots**: 6.7", 6.5", 5.5" iPhone + 12.9", 11" iPad
 - **App Icon**: 1024x1024 PNG
 - **Privacy Policy**: Required URL
@@ -270,6 +297,7 @@ eas submit --platform ios
 ### **🤖 Google Play Store Deployment**
 
 #### **Prerequisites**
+
 - Google Play Console Account ($25 one-time)
 - Android keystore for signing
 - EAS CLI installed
@@ -277,6 +305,7 @@ eas submit --platform ios
 #### **Step-by-Step Android Deployment**
 
 1. **Configure Android Build**
+
 ```json
 // app.json
 {
@@ -284,11 +313,7 @@ eas submit --platform ios
     "android": {
       "package": "com.yourcompany.pantrypal",
       "versionCode": 1,
-      "permissions": [
-        "CAMERA",
-        "WRITE_EXTERNAL_STORAGE",
-        "NOTIFICATIONS"
-      ],
+      "permissions": ["CAMERA", "WRITE_EXTERNAL_STORAGE", "NOTIFICATIONS"],
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#22C55E"
@@ -299,6 +324,7 @@ eas submit --platform ios
 ```
 
 2. **Generate Keystore**
+
 ```bash
 # Generate upload keystore
 eas credentials
@@ -308,6 +334,7 @@ keytool -genkeypair -v -keystore upload-keystore.jks -alias upload -keyalg RSA -
 ```
 
 3. **Build for Android**
+
 ```bash
 # Create production build
 eas build --platform android --profile production
@@ -316,6 +343,7 @@ eas build --platform android --profile production
 ```
 
 4. **Submit to Play Store**
+
 ```bash
 # Submit directly to Play Store
 eas submit --platform android
@@ -324,6 +352,7 @@ eas submit --platform android
 ```
 
 5. **Play Console Setup**
+
 - Login to [Google Play Console](https://play.google.com/console)
 - Create new app
 - Upload Android App Bundle (.aab)
@@ -332,6 +361,7 @@ eas submit --platform android
 - Submit for review (1-3 days)
 
 #### **Play Store Requirements**
+
 - **Screenshots**: Phone, 7" tablet, 10" tablet
 - **Feature Graphic**: 1024x500 PNG
 - **App Icon**: 512x512 PNG
@@ -343,6 +373,7 @@ eas submit --platform android
 ### **🔧 Build Configuration**
 
 #### **EAS Build Profiles**
+
 ```json
 // eas.json
 {
@@ -376,6 +407,7 @@ eas submit --platform android
 ```
 
 #### **Environment Variables**
+
 ```bash
 # .env.production
 EXPO_PUBLIC_API_URL=https://api.pantrypal.com
@@ -388,6 +420,7 @@ EXPO_PUBLIC_ANALYTICS_ID=your_analytics_id
 ## 🔑 API Integration Guide
 
 ### **OpenAI Integration**
+
 ```typescript
 // Get API key from https://platform.openai.com
 const OPENAI_API_KEY = "sk-...";
@@ -397,20 +430,22 @@ Settings → AI Features → AI API Key → Enter key
 ```
 
 ### **Google Cloud Vision**
+
 ```typescript
 // Get API key from Google Cloud Console
-const GOOGLE_VISION_KEY = "AIza...";
+const GOOGLE_VISION_KEY = 'AIza...';
 
 // Enable Vision API in Google Cloud
 // Configure billing and quotas
 ```
 
 ### **AWS Rekognition**
+
 ```typescript
 // Get credentials from AWS Console
-const AWS_ACCESS_KEY = "AKIA...";
-const AWS_SECRET_KEY = "...";
-const AWS_REGION = "us-east-1";
+const AWS_ACCESS_KEY = 'AKIA...';
+const AWS_SECRET_KEY = '...';
+const AWS_REGION = 'us-east-1';
 ```
 
 ---
@@ -418,6 +453,7 @@ const AWS_REGION = "us-east-1";
 ## 📊 Analytics & Monitoring
 
 ### **Built-in Analytics**
+
 - User engagement tracking
 - Feature usage statistics
 - Error reporting and crash analytics
@@ -425,6 +461,7 @@ const AWS_REGION = "us-east-1";
 - Food waste reduction metrics
 
 ### **Third-Party Integration**
+
 ```typescript
 // Recommended analytics services
 - Google Analytics 4
@@ -439,12 +476,14 @@ const AWS_REGION = "us-east-1";
 ## 🔒 Security & Privacy
 
 ### **Data Protection**
+
 - **Local-First**: All data stored locally by default
 - **Encryption**: Sensitive data encrypted at rest
 - **API Security**: Secure API key management
 - **Privacy Controls**: User controls data sharing
 
 ### **Compliance**
+
 - GDPR compliant
 - CCPA compliant
 - SOC 2 Type II ready
@@ -457,6 +496,7 @@ const AWS_REGION = "us-east-1";
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ### **Development Setup**
+
 ```bash
 # Fork the repository
 git clone https://github.com/yourusername/pantry-pal.git
@@ -482,12 +522,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🆘 Support
 
 ### **Getting Help**
+
 - **Documentation**: Check this README and docs folder
 - **Issues**: Create a GitHub issue for bugs
 - **Discussions**: Use GitHub Discussions for questions
-- **Email**: support@pantrypal.com
+- **Email**: <support@pantrypal.com>
 
 ### **Community**
+
 - **Discord**: [Join our community](https://discord.gg/pantrypal)
 - **Twitter**: [@PantryPalApp](https://twitter.com/pantrypalapp)
 - **Website**: [pantrypal.com](https://pantrypal.com)
@@ -497,12 +539,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🎯 Roadmap
 
 ### **Version 1.1 (Next Release)**
+
 - [ ] Voice commands for hands-free operation
 - [ ] Meal planning integration
 - [ ] Family sharing features
 - [ ] Advanced recipe filtering
 
 ### **Version 1.2 (Future)**
+
 - [ ] Grocery store integration
 - [ ] Nutritional tracking
 - [ ] Sustainability scoring
