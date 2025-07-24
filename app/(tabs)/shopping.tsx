@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+// app/(tabs)/shopping.tsx - COMPLETE FIXED FILE
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -8,15 +9,17 @@ import {
   TextInput,
   Alert,
   Animated,
-  SafeAreaView, // Removed duplicate Animated import
+  SafeAreaView,
   Platform,
   ActivityIndicator,
   Keyboard,
-} from 'react-native'; // Removed duplicate Animated import
+} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Feather } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '@/contexts/ThemeContext';
+import { PantryDatabase } from '@/database/PantryDatabase';
+import * as Haptics from 'expo-haptics';
 
 interface ShoppingItem {
   id: string;
@@ -32,6 +35,7 @@ export default function ShoppingScreen() {
   const [fadeAnim] = useState(new Animated.Value(0));
   const [isLoading, setIsLoading] = useState(true);
   const [buttonScale] = useState(new Animated.Value(1));
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     loadShoppingList();
@@ -66,8 +70,13 @@ export default function ShoppingScreen() {
     }
   };
 
-  const handleAddButtonPress = () => {
-    // Animate the button press
+  const animateButton = () => {
+    // Provide haptic feedback if available
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    }
+
+    // Animate the button
     Animated.sequence([
       Animated.timing(buttonScale, {
         toValue: 0.95,
@@ -80,15 +89,15 @@ export default function ShoppingScreen() {
         useNativeDriver: true,
       }),
     ]).start();
+  };
 
-    // Call the add item function
+  const handleAddButtonPress = () => {
+    animateButton();
     addItem();
   };
 
   const addItem = () => {
-    console.log('Adding item:', newItemName);
     if (!newItemName.trim()) {
-      console.log('Item name is empty, not adding');
       return;
     }
 
@@ -151,15 +160,56 @@ export default function ShoppingScreen() {
     );
   };
 
+  const addItemsFromPantry = async () => {
+    try {
+      // Get low or expiring items from pantry
+      const pantryItems = await PantryDatabase.getAllItems();
+      const lowItems = pantryItems.filter((item) => {
+        // Items that are about to expire or low in quantity
+        const expiry = new Date(item.expiryDate);
+        const now = new Date();
+        const daysLeft = Math.ceil(
+          (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+        );
+
+        return daysLeft < 3 || item.quantity < 2;
+      });
+
+      if (lowItems.length === 0) {
+        Alert.alert('No Items Needed', 'Your pantry is well-stocked!');
+        return;
+      }
+
+      // Convert pantry items to shopping items
+      const shoppingItems = lowItems.map((item) => ({
+        id: Date.now() + Math.random().toString(),
+        name: item.name,
+        completed: false,
+        createdAt: new Date().toISOString(),
+      }));
+
+      // Add to shopping list
+      const updatedItems = [...shoppingItems, ...items];
+      setItems(updatedItems);
+      saveShoppingList(updatedItems);
+
+      Alert.alert(
+        'Success',
+        `Added ${shoppingItems.length} items to your shopping list.`
+      );
+    } catch (error) {
+      console.error('Error adding pantry items to shopping list:', error);
+      Alert.alert('Error', 'Failed to add items from pantry.');
+    }
+  };
+
   const renderShoppingItem = ({ item }: { item: ShoppingItem }) => (
     <Animated.View
       style={[
         styles.itemCard,
         item.completed && styles.itemCardCompleted,
         { backgroundColor: theme.colors.surface },
-      ]} // @ts-ignore
-      entering={Animated.FadeInDown.duration(300)} // @ts-ignore
-      exiting={Animated.FadeOutUp.duration(200)} // @ts-ignore
+      ]}
     >
       <TouchableOpacity
         style={styles.itemContent}
@@ -170,7 +220,10 @@ export default function ShoppingScreen() {
           style={[
             styles.checkbox,
             { borderColor: theme.colors.border },
-            item.completed && styles.checkboxCompleted,
+            item.completed && {
+              backgroundColor: theme.colors.success,
+              borderColor: theme.colors.success,
+            },
           ]}
         >
           {item.completed && <Feather name="check" size={16} color="#FFFFFF" />}
@@ -223,6 +276,7 @@ export default function ShoppingScreen() {
           ]}
         >
           <TextInput
+            ref={inputRef}
             style={[styles.input, { color: theme.colors.text }]}
             value={newItemName}
             onChangeText={setNewItemName}
@@ -258,6 +312,24 @@ export default function ShoppingScreen() {
           </Animated.View>
         </View>
       </View>
+
+      <TouchableOpacity
+        style={[
+          styles.smartButton,
+          { backgroundColor: theme.colors.primary + '20' },
+        ]}
+        onPress={addItemsFromPantry}
+      >
+        <Feather
+          name="refresh-cw"
+          size={16}
+          color={theme.colors.primary}
+          style={{ marginRight: 8 }}
+        />
+        <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>
+          Replenish from Pantry
+        </Text>
+      </TouchableOpacity>
 
       {isLoading ? (
         <View style={styles.loaderContainer}>
@@ -337,19 +409,16 @@ export default function ShoppingScreen() {
           { backgroundColor: theme.colors.secondary },
         ]}
         onPress={() => {
-          // Focus the text input
-          Animated.sequence([
-            Animated.timing(buttonScale, {
-              toValue: 0.95,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-            Animated.timing(buttonScale, {
-              toValue: 1,
-              duration: 100,
-              useNativeDriver: true,
-            }),
-          ]).start();
+          animateButton();
+          // If there's text in the input, add the item
+          if (newItemName.trim()) {
+            addItem();
+          } else {
+            // Otherwise focus the input field
+            if (inputRef.current) {
+              inputRef.current.focus();
+            }
+          }
         }}
         activeOpacity={0.8}
       >
@@ -413,6 +482,15 @@ const styles = StyleSheet.create({
     width: 36,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  smartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginHorizontal: 20,
+    marginBottom: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
   },
   listContainer: {
     flex: 1,
