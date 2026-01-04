@@ -1,11 +1,13 @@
 {
   "cli": {
-    "version": ">= 7.0.0"
+    "version": ">= 7.0.0",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
       "distribution": "internal",
+      "channel": "development",
       "ios": {
         "resourceClass": "m1-medium"
       },
@@ -14,6 +16,7 @@
       }
     },
     "preview": {
+      "channel": "preview",
       "distribution": "internal",
       "ios": {
         "resourceClass": "m1-medium"
@@ -23,15 +26,27 @@
       }
     },
     "production": {
+      "channel": "production",
+      "autoIncrement": true,
       "ios": {
         "resourceClass": "m1-medium"
       },
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleRelease"
       }
     }
   },
   "submit": {
-    "production": {}
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@email.com",
+        "ascAppId": "1234567890",
+        "appleTeamId": "ABC123XYZ"
+      },
+      "android": {
+        "track": "production"
+      }
+    }
   }
 }

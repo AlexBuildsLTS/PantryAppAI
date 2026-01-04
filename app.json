@@ -1,25 +1,34 @@
 {
   "expo": {
     "name": "Pantry Pal",
-    "slug": "pantryapp",
+    "slug": "pantry-pal",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "pantrypal",
     "userInterfaceStyle": "automatic",
-    "description": "AI-powered smart food inventory management app",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/images/icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0A0A0A"
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.pantrypal.app",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.mirage.pantrypal",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Pantry Pal needs camera access to scan your fridge and identify food items using AI.",
+        "NSPhotoLibraryUsageDescription": "Pantry Pal needs access to your photos to let you upload images of receipts.",
+        "NSNotificationsUsageDescription": "Pantry Pal will notify you before your food expires to help reduce waste."
+      }
     },
     "android": {
-      "package": "com.pantrypal.app",
-      "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#22C55E"
-      }
+        "foregroundImage": "./assets/images/favicon.png",
+        "backgroundColor": "#0A0A0A"
+      },
+      "package": "com.mirage.pantrypal",
+      "permissions": ["CAMERA", "NOTIFICATIONS", "FOREGROUND_SERVICE"]
     },
     "web": {
       "bundler": "metro",
@@ -28,17 +37,32 @@
     },
     "plugins": [
       "expo-router",
+      "expo-secure-store",
       "expo-font",
-      "expo-web-browser"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Pantry Pal to use the camera."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/favicon.png",
+          "color": "#22C55E"
+        }
+      ]
     ],
-    "experiments": {
-      "typedRoutes": true
-    },
     "extra": {
-      "router": {},
+      "router": {
+        "origin": false
+      },
       "eas": {
         "projectId": "81098dca-a4e2-43e0-a325-4f5fc08319f2"
       }
+    },
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }

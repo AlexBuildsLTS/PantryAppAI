@@ -1,13 +1,12 @@
-// Learn more https://docs.expo.dev/guides/customizing-metro
 const { getDefaultConfig } = require('expo/metro-config');
+const { withNativeWind } = require('nativewind/metro');
 
-/** @type {import('expo/metro-config').MetroConfig} */
 const config = getDefaultConfig(__dirname);
+config.resolver.sourceExts.push('css');
 
-// 1. Enable support for SQLite databases and WebAssembly modules.
-config.resolver.assetExts.push('db', 'wasm');
-
-// 2. Enable support for `mjs` files for Metro.
-config.resolver.sourceExts.push('mjs');
-
-module.exports = config;
+module.exports = withNativeWind(config, {
+  // Matches the output path in the build command above
+  input: './global.css',
+  projectRoot: __dirname,
+  inlineStyles: true,
+});
