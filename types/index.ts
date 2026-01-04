@@ -1,47 +1,22 @@
-export * from './PantryItem';
+/**
+ * @module Types
+ * Centralized Type Definition Hub for the Pantry Pal Ecosystem.
+ */
+
+// 1. Export the auto-generated Supabase schema
+export * from './database.types';
+
+// 2. Export refined UI models
 export * from './User';
-export * from './Notification';
 export * from './Recipe';
+export * from './PantryItem';
 
-// Common types used across the app
-export interface ApiResponse<T> {
-  data: T;
-  error?: string;
-  success: boolean;
-}
-
-export interface LoadingState {
-  isLoading: boolean;
-  error: string | null;
-}
-
-export interface AsyncOperationResult<T> {
-  success: boolean;
-  data?: T;
-  error?: string;
-}
-
+// 3. System-wide utility types
 export interface AIDetectionResult {
-  itemName: string;
+  name: string;
   confidence: number;
-  category?: string;
-  suggestedLocation?: 'Pantry' | 'Fridge' | 'Freezer';
-  estimatedExpiry?: number; // days from now
+  expiry_days: number;
+  location: 'pantry' | 'fridge' | 'freezer';
 }
 
-export interface NotificationSettings {
-  enabled: boolean;
-  expirationAlerts: boolean;
-  shoppingReminders: boolean;
-  weeklyReports: boolean;
-  soundEnabled: boolean;
-  vibrationEnabled: boolean;
-}
-
-export interface AppSettings {
-  theme: 'light' | 'dark' | 'auto';
-  notifications: NotificationSettings;
-  aiApiKey?: string;
-  language: string;
-  currency: string;
-}
+export type StorageLocation = 'pantry' | 'fridge' | 'freezer' | 'other';

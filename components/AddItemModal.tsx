@@ -1,140 +1,228 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Modal, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  Modal,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
+} from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
+import { supabase } from '@/services/supabase';
+import { useAuth } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
-import DatePicker from 'react-native-date-picker';
-import { BarcodeScanner } from '@/components/BarcodeScanner';
-import { PantryDatabase } from '@/database/PantryDatabase';
-import { PantryItem, LocationType, UnitType } from '@/types/PantryItem';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useAsyncOperation } from '@/hooks/useAsyncOperation';
-import { validatePantryItem, sanitizeInput } from '@/utils/validation';
 import * as Haptics from 'expo-haptics';
-import Animated, { useSharedValue, useAnimatedStyle, withTiming, withSpring } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
 
-interface AddItemModalProps {
+interface Props {
   visible: boolean;
   onClose: () => void;
-  onSave: () => void;
-  editingItem?: PantryItem | null;
+  onRefresh: () => void;
 }
 
-export function AddItemModal({ visible, onClose, onSave, editingItem }: AddItemModalProps) {
-  const { theme } = useTheme();
+export function AddItemModal({ visible, onClose, onRefresh }: Props) {
+  const { user } = useAuth();
   const [name, setName] = useState('');
-  const [quantity, setQuantity] = useState('');
-  const [unit, setUnit] = useState<UnitType>('pcs');
-  const [location, setLocation] = useState<LocationType>('Pantry');
-  const [expiryDate, setExpiryDate] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false);
-  const { execute: executeAsync, isLoading } = useAsyncOperation();
-  
-  const modalY = useSharedValue(600);
-  const animatedModalStyle = useAnimatedStyle(() => ({ transform: [{ translateY: modalY.value }] }));
+  const [location, setLocation] = useState<'pantry' | 'fridge' | 'freezer'>(
+    'pantry'
+  );
+  const [loading, setLoading] = useState(false);
+
+  // Animation Values
+  const translateY = useSharedValue(600);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: translateY.value }],
+  }));
 
   useEffect(() => {
     if (visible) {
-      if (editingItem) {
-        setName(editingItem.name);
-        setQuantity(editingItem.quantity.toString());
-        setUnit(editingItem.unit as UnitType);
-        setLocation(editingItem.location as LocationType);
-        setExpiryDate(new Date(editingItem.expiryDate));
-      } else {
-        resetForm();
-      }
-      modalY.value = withSpring(0, { damping: 15, stiffness: 120 });
+      translateY.value = withSpring(0, { damping: 15 });
     } else {
-      modalY.value = withTiming(600, { duration: 300 });
+      translateY.value = withTiming(600);
     }
-  }, [visible, editingItem]);
+  }, [visible]);
 
-  const resetForm = () => {
-    setName(''); setQuantity(''); setUnit('pcs'); setLocation('Pantry');
-    const defaultExpiry = new Date();
-    defaultExpiry.setDate(defaultExpiry.getDate() + 7);
-    setExpiryDate(defaultExpiry);
-  };
+  const handleAdd = async () => {
+    if (!name) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      return Alert.alert('Missing Info', 'What are we adding to the pantry?');
+    }
 
-  const handleSave = async () => {
+    setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const itemData = { name: sanitizeInput(name), quantity: Number(quantity), unit, location, expiryDate: expiryDate.toISOString() };
-    const validationErrors = validatePantryItem(itemData);
-    if (validationErrors.length > 0) { Alert.alert('Validation Error', validationErrors.join('\n')); return; }
 
-    const result = await executeAsync(async () => {
-      if (editingItem) await PantryDatabase.updateItem(editingItem.id!, itemData);
-      else await PantryDatabase.addItem(itemData);
-    }, editingItem ? 'Updating item' : 'Adding item');
+    try {
+      // 1. Get the household (Optimized: we could also store this in AuthContext)
+      const { data: memberData } = await supabase
+        .from('household_members')
+        .select('household_id')
+        .eq('user_id', user?.id)
+        .single();
 
-    if (result.success) { onSave(); onClose(); }
-  };
-  
-  const handleBarcodeScanned = (barcode: string) => {
-    setShowBarcodeScanner(false);
-    setName(`Scanned Product ${barcode.slice(-4)}`);
+      if (!memberData) throw new Error('Join a household to add items.');
+
+      // 2. Insert into Supabase
+      const { error } = await supabase.from('pantry_items').insert({
+        name,
+        location,
+        household_id: memberData.household_id,
+        added_by: user?.id,
+        status: 'fresh',
+      });
+
+      if (error) throw error;
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setName('');
+      onRefresh();
+      onClose();
+    } catch (error: any) {
+      Alert.alert('Database Error', error.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <Modal visible={visible} animationType="none" transparent onRequestClose={onClose}>
-      <BlurView intensity={20} style={styles.overlay}>
-        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.keyboardView}>
-            <Animated.View style={[ styles.modalContainer, { backgroundColor: theme.colors.surface }, animatedModalStyle ]}>
-                <View style={[styles.header, { borderBottomColor: theme.colors.border }]}>
-                    <Text style={[styles.title, { color: theme.colors.text }]}>{editingItem ? 'Edit Item' : 'Add New Item'}</Text>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}><Feather name="x" size={24} color={theme.colors.textSecondary} /></TouchableOpacity>
-                </View>
-                <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-                    {/* Form sections... */}
-                    <View style={styles.section}>
-                        <Text style={[styles.label, { color: theme.colors.text }]}>Item Name</Text>
-                        <View style={styles.inputRow}>
-                            <View style={[styles.inputContainer, { flex: 1, backgroundColor: theme.colors.background, borderColor: theme.colors.border }]}>
-                                <Feather name="package" size={20} color={theme.colors.textTertiary} />
-                                <TextInput style={[styles.input, { color: theme.colors.text }]} value={name} onChangeText={setName} placeholder="e.g., Milk, Bread, Apples" placeholderTextColor={theme.colors.textTertiary} />
-                            </View>
-                            <TouchableOpacity style={[styles.scanButton, { backgroundColor: `${theme.colors.primary}20`, borderColor: theme.colors.primary }]} onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); setShowBarcodeScanner(true); }}>
-                                <Feather name="camera" size={20} color={theme.colors.primary} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                     {/* ... other form sections */}
-                </ScrollView>
-                <View style={[styles.footer, { borderTopColor: theme.colors.border }]}>
-                    <TouchableOpacity style={[styles.cancelButton, { borderColor: theme.colors.border }]} onPress={onClose} disabled={isLoading}><Text style={[styles.cancelText, { color: theme.colors.textSecondary }]}>Cancel</Text></TouchableOpacity>
-                    <TouchableOpacity style={[styles.saveButton, { opacity: isLoading ? 0.7 : 1 }]} onPress={handleSave} disabled={isLoading}>
-                        <LinearGradient colors={theme.gradients.primary as any} style={styles.saveGradient}><Text style={styles.saveText}>{isLoading ? 'Saving...' : (editingItem ? 'Update Item' : 'Add Item')}</Text></LinearGradient>
-                    </TouchableOpacity>
-                </View>
-            </Animated.View>
+    <Modal visible={visible} transparent animationType="none">
+      <View style={styles.container}>
+        {/* Tap background to close */}
+        <TouchableOpacity
+          style={styles.backdrop}
+          activeOpacity={1}
+          onPress={onClose}
+        >
+          <BlurView intensity={30} style={StyleSheet.absoluteFill} />
+        </TouchableOpacity>
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <Animated.View style={[styles.sheet, animatedStyle]}>
+            <View style={styles.handle} />
+
+            <Text style={styles.title}>New Item</Text>
+
+            <View style={styles.inputContainer}>
+              <Feather
+                name="shopping-bag"
+                size={20}
+                color="#666"
+                style={styles.icon}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Item name..."
+                placeholderTextColor="#666"
+                value={name}
+                onChangeText={setName}
+                autoFocus
+              />
+            </View>
+
+            <Text style={styles.label}>Storage Location</Text>
+            <View style={styles.selector}>
+              {['pantry', 'fridge', 'freezer'].map((loc) => (
+                <TouchableOpacity
+                  key={loc}
+                  onPress={() => setLocation(loc as any)}
+                  style={[
+                    styles.option,
+                    location === loc && styles.activeOption,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.optionText,
+                      location === loc && styles.activeOptionText,
+                    ]}
+                  >
+                    {loc.charAt(0).toUpperCase() + loc.slice(1)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveButton, loading && { opacity: 0.7 }]}
+              onPress={handleAdd}
+              disabled={loading}
+            >
+              <Text style={styles.saveButtonText}>
+                {loading ? 'Syncing...' : 'Add to Inventory'}
+              </Text>
+            </TouchableOpacity>
+          </Animated.View>
         </KeyboardAvoidingView>
-        <DatePicker modal open={showDatePicker} date={expiryDate} onConfirm={(date) => { setShowDatePicker(false); setExpiryDate(date); }} onCancel={() => setShowDatePicker(false)} mode="date" title="Select Expiry Date" minimumDate={new Date()} />
-        <BarcodeScanner visible={showBarcodeScanner} onClose={() => setShowBarcodeScanner(false)} onBarcodeScanned={handleBarcodeScanned} />
-      </BlurView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1 },
-  keyboardView: { flex: 1, justifyContent: 'flex-end' },
-  modalContainer: { borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: '90%' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, borderBottomWidth: 1 },
-  title: { fontSize: 20, fontWeight: '700' },
-  closeButton: { padding: 4 },
-  content: { padding: 20 },
-  section: { marginBottom: 24 },
-  label: { fontSize: 16, fontWeight: '600', marginBottom: 8 },
-  inputRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  inputContainer: { flexDirection: 'row', alignItems: 'center', borderRadius: 12, paddingHorizontal: 16, borderWidth: 1 },
-  input: { flex: 1, marginLeft: 12, fontSize: 16, height: 48 },
-  scanButton: { width: 48, height: 52, borderRadius: 12, justifyContent: 'center', alignItems: 'center', borderWidth: 1 },
-  footer: { flexDirection: 'row', padding: 20, gap: 12, borderTopWidth: 1 },
-  cancelButton: { flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 1, alignItems: 'center' },
-  cancelText: { fontSize: 16, fontWeight: '600' },
-  saveButton: { flex: 1, borderRadius: 12, overflow: 'hidden' },
-  saveGradient: { paddingVertical: 14, alignItems: 'center' },
-  saveText: { fontSize: 16, fontWeight: '600', color: '#FFFFFF' },
+  container: { flex: 1, justifyContent: 'flex-end' },
+  backdrop: { ...StyleSheet.absoluteFillObject },
+  sheet: {
+    backgroundColor: '#1A1A1A',
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    padding: 24,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  handle: {
+    width: 40,
+    height: 5,
+    backgroundColor: '#333',
+    borderRadius: 10,
+    alignSelf: 'center',
+    marginBottom: 20,
+  },
+  title: { fontSize: 24, fontWeight: 'bold', color: '#FFF', marginBottom: 25 },
+  label: { color: '#999', fontSize: 14, marginBottom: 10, fontWeight: '600' },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#262626',
+    borderRadius: 15,
+    paddingHorizontal: 15,
+    marginBottom: 25,
+    height: 60,
+  },
+  icon: { marginRight: 12 },
+  input: { flex: 1, color: '#FFF', fontSize: 16 },
+  selector: { flexDirection: 'row', gap: 10, marginBottom: 30 },
+  option: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: '#262626',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  activeOption: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
+  optionText: { color: '#999', fontWeight: '600' },
+  activeOptionText: { color: '#FFF' },
+  saveButton: {
+    backgroundColor: '#22C55E',
+    height: 60,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#22C55E',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+  },
+  saveButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
 });

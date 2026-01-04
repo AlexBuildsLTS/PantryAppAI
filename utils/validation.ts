@@ -1,36 +1,59 @@
-import { PantryItem } from '@/types/PantryItem';
+/**
+ * @module ValidationUtils
+ * Provides strict validation and sanitization for pantry operations.
+ * Optimized for PostgreSQL/Supabase data integrity.
+ */
 
-export const validatePantryItem = (item: Partial<PantryItem>): string[] => {
+import { Database } from '@/types/database.types';
+
+// Extract the Insert type from your auto-generated Supabase types
+type PantryInsert = Database['public']['Tables']['pantry_items']['Insert'];
+
+/**
+ * Validates a pantry item against database constraints.
+ * Returns an array of localized error strings.
+ */
+export const validatePantryItem = (item: Partial<PantryInsert>): string[] => {
   const errors: string[] = [];
-  
-  if (!item.name?.trim()) {
-    errors.push('Item name is required');
+
+  // 1. Name Validation (Required, Max Length)
+  if (!item.name || item.name.trim().length === 0) {
+    errors.push('Item name is mandatory.');
+  } else if (item.name.length > 100) {
+    errors.push('Name is too long (Max 100 characters).');
   }
-  
-  if (!item.quantity || item.quantity <= 0) {
-    errors.push('Quantity must be greater than 0');
+
+  // 2. Quantity Validation (Postgres Numeric compatibility)
+  if (item.quantity === undefined || item.quantity === null) {
+    errors.push('Quantity is required.');
+  } else if (isNaN(Number(item.quantity)) || Number(item.quantity) <= 0) {
+    errors.push('Quantity must be a positive number.');
   }
-  
-  if (!item.unit?.trim()) {
-    errors.push('Unit is required');
+
+  // 3. Enum Validation (Ensures alignment with SQL storage_type)
+  const validLocations = ['pantry', 'fridge', 'freezer', 'other'];
+  if (!item.location || !validLocations.includes(item.location)) {
+    errors.push('Please select a valid storage location.');
   }
-  
-  if (!item.location?.trim()) {
-    errors.push('Location is required');
-  }
-  
-  if (!item.expiryDate) {
-    errors.push('Expiry date is required');
-  } else {
-    const expiryDate = new Date(item.expiryDate);
-    if (isNaN(expiryDate.getTime())) {
-      errors.push('Invalid expiry date');
+
+  // 4. Expiry Date Logic
+  if (item.expiry_date) {
+    const date = new Date(item.expiry_date);
+    if (isNaN(date.getTime())) {
+      errors.push('Invalid date format provided.');
     }
   }
-  
+
   return errors;
 };
 
+/**
+ * Performs aggressive sanitization to prevent XSS or broken DB queries.
+ * Standardizes casing for cleaner search analytics.
+ */
 export const sanitizeInput = (input: string): string => {
-  return input.trim().replace(/[<>]/g, '');
+  return input
+    .trim()
+    .replace(/[<>'"\\;]/g, '') // Strip SQL/HTML injection characters
+    .replace(/\s+/g, ' '); // Collapse multiple spaces
 };

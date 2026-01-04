@@ -1,13 +1,18 @@
-export interface PantryItem {
-  id?: number;
+export type PantryItem = {
+  id: string;
   name: string;
-  quantity: number;
-  unit: string;
-  location: string;
-  expiryDate: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export type LocationType = 'Pantry' | 'Fridge' | 'Freezer';
-export type UnitType = 'pcs' | 'g' | 'kg' | 'ml' | 'L' | 'cups' | 'tbsp' | 'tsp';
+  quantity: number | null;
+  unit: string | null;
+  expiry_date: string | null;
+  location: 'pantry' | 'fridge' | 'freezer' | 'other' | null;
+  created_at: string | null;
+  updated_at: string | null;
+  added_by?: string | null;
+  brand?: string | null;
+  category?: string | null;
+  image_url?: string | null;
+  is_favorite?: boolean | null;
+  metadata?: any | null;
+  status?: 'fresh' | 'expiring' | 'expired' | 'consumed' | 'wasted' | null;
+  household_id?: string | null;
+};

@@ -1,95 +1,46 @@
+/**
+ * @component ErrorBoundary
+ * Catches JavaScript errors anywhere in the child component tree.
+ */
 import React, { Component, ReactNode } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 
 interface Props {
   children: ReactNode;
-  fallback?: ReactNode;
 }
-
 interface State {
   hasError: boolean;
   error?: Error;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
-  }
+  state: State = { hasError: false };
 
   static getDerivedStateFromError(error: Error): State {
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-  }
-
-  handleRetry = () => {
-    this.setState({ hasError: false, error: undefined });
-  };
-
   render() {
     if (this.state.hasError) {
-      if (this.props.fallback) {
-        return this.props.fallback;
-      }
-
       return (
-        <View style={styles.container}>
-          <Feather name="alert-triangle" size={64} color="#EF4444" />
-          <Text style={styles.title}>Something went wrong</Text>
-          <Text style={styles.message}>
-            {this.state.error?.message || 'An unexpected error occurred'}
+        <View className="items-center justify-center flex-1 p-10 bg-background dark:bg-black">
+          <Feather name="alert-circle" size={64} color="#EF4444" />
+          <Text className="mt-6 text-2xl font-bold text-white">
+            Something went wrong
           </Text>
-          <TouchableOpacity style={styles.retryButton} onPress={this.handleRetry}>
-            <Feather name="refresh-cw" size={20} color="#FFFFFF" />
-            <Text style={styles.retryText}>Try Again</Text>
+          <Text className="mt-2 mb-8 text-center text-text-secondary">
+            {this.state.error?.message}
+          </Text>
+          <TouchableOpacity
+            className="px-8 py-4 bg-primary rounded-2xl"
+            onPress={() => this.setState({ hasError: false })}
+          >
+            <Text className="font-bold text-white">Try Again</Text>
           </TouchableOpacity>
         </View>
       );
     }
-
     return this.props.children;
   }
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-    backgroundColor: '#F9FAFB',
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#111827',
-    marginTop: 24,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  message: {
-    fontSize: 16,
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: 32,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#22C55E',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-  },
-  retryText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#FFFFFF',
-  },
-});

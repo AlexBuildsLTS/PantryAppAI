@@ -1,142 +1,143 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { AuthService } from '@/services/AuthService';
-import { User, AuthState } from '@/types/User';
-import { logError } from '@/utils/errorHandler';
+/**
+ * @module AuthContext
+ * The core state engine for Pantry Pal.
+ * Manages Session, User Profile, and Household-context globally.
+ */
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { Session, User } from '@supabase/supabase-js';
+import { supabase } from '../services/supabase';
 
-interface AuthContextType extends AuthState {
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, displayName: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  updateProfile: (updates: Partial<User>) => Promise<void>;
+interface Profile {
+  id: string;
+  full_name: string;
+  avatar_url: string;
+  role: 'admin' | 'moderator' | 'premium' | 'member';
 }
+
+interface Household {
+  id: string;
+  name: string;
+}
+
+type AuthContextType = {
+  session: Session | null;
+  user: User | null;
+  profile: Profile | null;
+  household: Household | null;
+  isLoading: boolean;
+  signIn: (email: string, pass: string) => Promise<any>;
+  signUp: (email: string, pass: string, name: string) => Promise<any>;
+  signOut: () => Promise<void>;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export function AuthProvider({ children }: AuthProviderProps) {
-  const [authState, setAuthState] = useState<AuthState>({
-    user: null,
-    isAuthenticated: false,
-    isLoading: true,
-    error: null,
-  });
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [household, setHousehold] = useState<Household | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    checkAuthState();
+    // Initial Session Check
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      handleAuthStateChange(session);
+    });
+
+    // Listen for real-time Auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleAuthStateChange(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const checkAuthState = async () => {
+  /**
+   * Orchestrates the fetching of user metadata when auth state changes.
+   */
+  const handleAuthStateChange = async (currentSession: Session | null) => {
+    setSession(currentSession);
+    const currentUser = currentSession?.user ?? null;
+    setUser(currentUser);
+
+    if (currentUser) {
+      await fetchUserData(currentUser.id);
+    } else {
+      // Clear state on Logout
+      setProfile(null);
+      setHousehold(null);
+    }
+    setIsLoading(false);
+  };
+
+  /**
+   * Senior-Level Optimization: Fetch profile and household in parallel
+   */
+  const fetchUserData = async (userId: string) => {
     try {
-      const user = await AuthService.getCurrentUser();
-      setAuthState({
-        user,
-        isAuthenticated: !!user,
-        isLoading: false,
-        error: null,
-      });
+      // 1. Fetch Profile
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      // 2. Fetch the primary household the user belongs to
+      const { data: membership } = await supabase
+        .from('household_members')
+        .select('household_id, households(id, name)')
+        .eq('user_id', userId)
+        .single();
+
+      if (profileData) setProfile(profileData);
+      if (membership?.households) {
+        // @ts-ignore - handling nested supabase join
+        setHousehold(membership.households);
+      }
     } catch (error) {
-      logError(error, 'Checking auth state');
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: 'Failed to check authentication',
-      });
+      console.error('Error fetching user global state:', error);
     }
   };
 
-  const signIn = async (email: string, password: string) => {
-    try {
-      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-      const user = await AuthService.signIn(email, password);
-      setAuthState({
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      logError(error, 'Sign in');
-      setAuthState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Sign in failed',
-      }));
-      throw error;
-    }
-  };
+  const signIn = (email: string, password: string) =>
+    supabase.auth.signInWithPassword({ email, password });
 
-  const signUp = async (email: string, password: string, displayName: string) => {
-    try {
-      setAuthState(prev => ({ ...prev, isLoading: true, error: null }));
-      const user = await AuthService.signUp(email, password, displayName);
-      setAuthState({
-        user,
-        isAuthenticated: true,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      logError(error, 'Sign up');
-      setAuthState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: error instanceof Error ? error.message : 'Sign up failed',
-      }));
-      throw error;
-    }
-  };
+  const signUp = (email: string, password: string, full_name: string) =>
+    supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name } },
+    });
 
   const signOut = async () => {
-    try {
-      await AuthService.signOut();
-      setAuthState({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        error: null,
-      });
-    } catch (error) {
-      logError(error, 'Sign out');
-      throw error;
-    }
-  };
-
-  const updateProfile = async (updates: Partial<User>) => {
-    try {
-      const updatedUser = await AuthService.updateProfile(updates);
-      setAuthState(prev => ({
-        ...prev,
-        user: updatedUser,
-      }));
-    } catch (error) {
-      logError(error, 'Update profile');
-      throw error;
-    }
+    await supabase.auth.signOut();
   };
 
   return (
     <AuthContext.Provider
       value={{
-        ...authState,
+        session,
+        user,
+        profile,
+        household,
+        isLoading,
         signIn,
         signUp,
         signOut,
-        updateProfile,
       }}
     >
       {children}
     </AuthContext.Provider>
   );
-}
+};
 
-export function useAuth() {
+export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
   return context;
-}
+};
