@@ -1,12 +1,14 @@
 {
+  // Custom words for cSpell spell checker to avoid false positives for project-specific terms
   "cSpell.words": [
-    "supabase",
-    "pantrypal",
-    "Nativewind",
-    "glassmorphism",
     "Bento",
+    "glassmorphism",
     "Haptics",
+    "Nativewind",
+    "pantrypal",
+    "supabase",
     "Tanstack"
   ],
+  // Disable Deno support as this project uses Node.js/React Native ecosystem
   "deno.enable": false
 }
