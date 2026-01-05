@@ -3,9 +3,9 @@
  * Enterprise-grade vision processing using Gemini 1.5 Flash.
  * Strictly typed and lint-compliant for Deno production environments.
  */
-declare const Deno: any;
+import { corsHeaders } from '../_shared/cors.ts';
 
-import { corsHeaders } from '../_shared/cors';
+declare const Deno: any;
 
 const GEMINI_API_URL =
   'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';

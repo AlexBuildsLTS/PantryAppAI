@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { corsHeaders } from '../_shared/cors';
-import { decryptMessage } from '../_shared/crypto';
+import { corsHeaders } from '../_shared/cors.ts';
+import { decryptMessage } from '../_shared/crypto.ts';
 
 declare const Deno: any;
 

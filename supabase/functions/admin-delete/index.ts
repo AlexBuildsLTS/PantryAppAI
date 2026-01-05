@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { corsHeaders } from '../_shared/cors';
-import { ensureAdmin, AdminAuthError } from '../_shared/auth';
+import { corsHeaders } from '../_shared/cors.ts';
+import { ensureAdmin, AdminAuthError } from "../_shared/auth.ts";
 
 declare const Deno: any;
 

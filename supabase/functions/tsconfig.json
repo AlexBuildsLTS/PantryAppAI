@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["deno.ns", "deno.window", "deno.worker"],
+    "lib": ["ESNext", "DOM", "WebWorker"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,

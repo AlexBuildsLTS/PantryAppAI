@@ -1,6 +1,8 @@
-import { serve } from "std/http/server.ts"
-import { createClient } from "@supabase/supabase-js"
-import { crypto } from "std/crypto/mod.ts";
+import { createClient } from '@supabase/supabase-js';
+import { corsHeaders as _corsHeaders } from '../_shared/cors.ts';
+import { decryptMessage as _decryptMessage } from '../_shared/crypto.ts';
+
+declare const Deno: any;
 
 // Helper to generate high-entropy token
 function generateToken(): string {
@@ -80,3 +82,6 @@ serve(async (req: Request) => {
     return new Response(JSON.stringify({ error: message }), { status: 400, headers: { 'Content-Type': 'application/json' } });
   }
 })
+function serve(arg0: (req: Request) => Promise<Response>) {
+  throw new Error('Function not implemented.');
+}

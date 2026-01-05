@@ -16,24 +16,25 @@
       "include": [
         "ban-untagged-todo",
         "camelcase",
+        "eqeqeq",
         "explicit-module-boundary-types",
         "no-console",
         "no-debugger",
         "no-eval",
         "no-implicit-any",
-        "deno/no-implicit-returns",
-        "deno/no-non-null-asserted-optional-chain",
+        "no-implicit-returns",
+        "no-non-null-asserted-optional-chain",
         "no-sparse-arrays",
         "no-undef",
         "no-unreachable",
         "no-var",
         "prefer-const",
-        "deno/prefer-template",
+        "prefer-template",
         "require-await",
-        "deno/single-attribute-per-line",
-        "deno/strict-null-check",
+        "single-attribute-per-line",
+        "strict-null-check",
         "triple-slash-reference",
-        "deno/use-enum"
+        "use-enum"
       ]
     },
     "exclude": [
