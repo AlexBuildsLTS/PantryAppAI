@@ -1,10 +1,6 @@
 {
   "compilerOptions": {
-    "lib": [
-      "deno.ns",
-      "deno.window",
-      "deno.worker"
-    ],
+    "lib": ["deno.ns", "deno.window", "deno.worker"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitOverride": true,
@@ -16,31 +12,28 @@
   },
   "lint": {
     "rules": {
-      "exclude": [
-        "no-explicit-any"
-      ],
+      "exclude": ["no-explicit-any"],
       "include": [
         "ban-untagged-todo",
         "camelcase",
-        "eqeqeq",
         "explicit-module-boundary-types",
         "no-console",
         "no-debugger",
         "no-eval",
         "no-implicit-any",
-        "no-implicit-returns",
-        "no-non-null-asserted-optional-chain",
+        "deno/no-implicit-returns",
+        "deno/no-non-null-asserted-optional-chain",
         "no-sparse-arrays",
         "no-undef",
         "no-unreachable",
         "no-var",
         "prefer-const",
-        "prefer-template",
+        "deno/prefer-template",
         "require-await",
-        "single-attribute-per-line",
-        "strict-null-check",
+        "deno/single-attribute-per-line",
+        "deno/strict-null-check",
         "triple-slash-reference",
-        "use-enum"
+        "deno/use-enum"
       ]
     },
     "exclude": [

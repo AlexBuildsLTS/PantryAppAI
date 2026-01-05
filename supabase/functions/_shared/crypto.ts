@@ -1,4 +1,7 @@
+// @ts-ignore
 import CryptoJS from 'crypto-js';
+
+declare const Deno: any;
 
 const ENCRYPTION_KEY = Deno.env.get('ENCRYPTION_KEY');
 
