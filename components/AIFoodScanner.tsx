@@ -1,172 +1,250 @@
-import React, { useState } from 'react';
+/**
+ * @file AIFoodScanner.tsx
+ * @description high-performance AI vision interface.
+ * Fixed: Explicit AIScanResult typing and memory management.
+ */
+
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
+  StyleSheet,
   TouchableOpacity,
-  Image,
-  ScrollView,
-  Alert,
   ActivityIndicator,
+  Alert,
+  Dimensions,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import { supabase } from '@/services/supabase';
-import { useAuth } from '@/contexts/AuthContext';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Feather } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 
-interface ScannedItem {
-  name: string;
-  quantity: number;
-  unit: string;
-  location: 'pantry' | 'fridge' | 'freezer';
-  expiry_days: number;
+// Internal Systems
+import { GeminiAIService, AIScanResult } from '../services/GeminiAIService';
+import { useTheme } from '../contexts/ThemeContext';
+
+interface AIFoodScannerProps {
+  isVisible: boolean;
+  onClose: () => void;
+  onItemsDetected: (items: any[]) => void;
 }
 
-export const AIFoodScanner = ({
-  onItemsAdded,
-}: {
-  onItemsAdded: () => void;
-}) => {
-  const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const [detectedItems, setDetectedItems] = useState<ScannedItem[]>([]);
+export default function AIFoodScanner({
+  isVisible,
+  onClose,
+  onItemsDetected,
+}: AIFoodScannerProps) {
+  const { colors } = useTheme();
+  const [permission, requestPermission] = useCameraPermissions();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const cameraRef = useRef<any>(null);
 
-  const handlePickImage = async () => {
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      base64: true,
-      quality: 0.7, // Optimized size for AI upload
-    });
+  if (!isVisible) return null;
 
-    if (!result.canceled) {
-      setPreviewImage(result.assets[0].uri);
-      processImage(result.assets[0].base64!);
-    }
-  };
+  if (!permission) return <View />;
+  if (!permission.granted) {
+    return (
+      <View
+        style={[
+          styles.permissionContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <Feather name="camera-off" size={64} color={colors.textSecondary} />
+        <Text style={[styles.permissionText, { color: colors.text }]}>
+          AI Vision requires camera access to identify items.
+        </Text>
+        <TouchableOpacity
+          style={[styles.btn, { backgroundColor: colors.primary }]}
+          onPress={requestPermission}
+        >
+          <Text style={styles.btnText}>Enable Camera</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
+          <Text style={{ color: colors.textSecondary }}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
 
-  const processImage = async (base64: string) => {
-    setLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handleCapture = async () => {
+    if (!cameraRef.current || isProcessing) return;
 
     try {
-      const { data, error } = await supabase.functions.invoke(
-        'pantry-ai-scanner',
-        {
-          body: { imageBase64: base64, userId: user?.id },
-        }
+      setIsProcessing(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+      const photo = await cameraRef.current.takePictureAsync({
+        base64: true,
+        quality: 0.5,
+      });
+
+      // Fixed: Casting result to AIScanResult to ensure .success exists
+      const result: AIScanResult = await GeminiAIService.scanFoodImage(
+        photo.base64
       );
 
-      if (error) throw error;
-      setDetectedItems(data.items);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      Alert.alert('Scanner Error', err.message);
+      if (result.success && result.detectedItems.length > 0) {
+        await Haptics.notificationAsync(
+          Haptics.NotificationFeedbackType.Success
+        );
+        onItemsDetected(result.detectedItems);
+      } else {
+        throw new Error(result.error || 'No items recognized');
+      }
+    } catch (error: any) {
+      Alert.alert(
+        'Recognition Failed',
+        'Gemini could not identify the items. Check lighting.'
+      );
     } finally {
-      setLoading(false);
-    }
-  };
-
-  const saveAllItems = async () => {
-    setLoading(true);
-    try {
-      const { data: household } = await supabase
-        .from('household_members')
-        .select('household_id')
-        .single();
-
-      const itemsToInsert = detectedItems.map((item) => ({
-        ...item,
-        household_id: household?.household_id,
-        added_by: user?.id,
-        expiry_date: new Date(
-          Date.now() + item.expiry_days * 86400000
-        ).toISOString(),
-      }));
-
-      const { error } = await supabase
-        .from('pantry_items')
-        .insert(itemsToInsert);
-      if (error) throw error;
-
-      Alert.alert('Success', `${detectedItems.length} items added!`);
-      setDetectedItems([]);
-      setPreviewImage(null);
-      onItemsAdded();
-    } catch (err: any) {
-      Alert.alert('Save Error', err.message);
-    } finally {
-      setLoading(false);
+      setIsProcessing(false);
     }
   };
 
   return (
-    <View className="p-6">
-      {!previewImage ? (
-        <TouchableOpacity
-          onPress={handlePickImage}
-          className="bg-primary h-40 rounded-[30px] items-center justify-center border-2 border-dashed border-white/20"
-        >
-          <Feather name="camera" size={40} color="white" />
-          <Text className="mt-2 font-bold text-white">
-            Scan Fridge or Receipt
-          </Text>
-        </TouchableOpacity>
-      ) : (
-        <BlurView
-          intensity={30}
-          className="rounded-[30px] overflow-hidden bg-white/5 border border-white/10 p-4"
-        >
-          <View className="flex-row items-center mb-4">
-            <Image
-              source={{ uri: previewImage }}
-              className="w-20 h-20 rounded-2xl"
-            />
-            <View className="flex-1 ml-4">
-              <Text className="text-lg font-bold text-white">AI Detection</Text>
-              <Text className="text-text-secondary">
-                {loading
-                  ? 'Analyzing food...'
-                  : `${detectedItems.length} items found`}
-              </Text>
+    <Animated.View
+      entering={FadeIn}
+      exiting={FadeOut}
+      style={styles.fullScreen}
+    >
+      <CameraView ref={cameraRef} style={styles.camera} facing="back">
+        <View style={styles.overlay}>
+          <View style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.closeCircle}>
+              <Feather name="x" size={24} color="white" />
+            </TouchableOpacity>
+            <View style={styles.aiLabel}>
+              <Text style={styles.aiLabelText}>GEMINI AI ACTIVE</Text>
+            </View>
+            <View style={{ width: 44 }} />
+          </View>
+
+          <View style={styles.scannerContainer}>
+            <View
+              style={[
+                styles.targetBox,
+                { borderColor: isProcessing ? colors.primary : 'white' },
+              ]}
+            >
+              {isProcessing && (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator size="large" color="white" />
+                  <Text style={styles.loadingText}>
+                    Analyzing Ingredients...
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
 
-          {loading ? (
-            <ActivityIndicator color="#22C55E" size="large" className="my-6" />
-          ) : (
-            <ScrollView className="mb-4 max-h-60">
-              {detectedItems.map((item, i) => (
-                <View
-                  key={i}
-                  className="flex-row justify-between py-2 border-b border-white/5"
-                >
-                  <Text className="font-medium text-white">{item.name}</Text>
-                  <Text className="font-bold text-primary-dark">
-                    +{item.expiry_days}d
-                  </Text>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-          <View className="flex-row gap-2">
+          <View style={styles.footer}>
+            <Text style={styles.hint}>Point at food to auto-detect</Text>
             <TouchableOpacity
-              onPress={() => setPreviewImage(null)}
-              className="items-center flex-1 p-4 bg-white/10 rounded-2xl"
+              style={[styles.captureBtn, { borderColor: colors.primary }]}
+              onPress={handleCapture}
+              disabled={isProcessing}
             >
-              <Text className="text-white">Discard</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={saveAllItems}
-              className="items-center p-4 flex-2 bg-primary rounded-2xl"
-            >
-              <Text className="font-bold text-white">Save All</Text>
+              <View
+                style={[
+                  styles.captureInner,
+                  { backgroundColor: isProcessing ? 'transparent' : 'white' },
+                ]}
+              />
             </TouchableOpacity>
           </View>
-        </BlurView>
-      )}
-    </View>
+        </View>
+      </CameraView>
+    </Animated.View>
   );
-};
+}
+
+const styles = StyleSheet.create({
+  fullScreen: { ...StyleSheet.absoluteFillObject, zIndex: 1000 },
+  camera: { flex: 1 },
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'space-between',
+    padding: 24,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  closeCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiLabel: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
+  },
+  aiLabelText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: '900',
+    letterSpacing: 1.5,
+  },
+  scannerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  targetBox: {
+    width: Dimensions.get('window').width * 0.75,
+    height: Dimensions.get('window').width * 0.75,
+    borderWidth: 2,
+    borderRadius: 40,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingOverlay: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    borderRadius: 40,
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+  },
+  loadingText: {
+    color: 'white',
+    marginTop: 12,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  footer: { alignItems: 'center', marginBottom: 40 },
+  hint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '700',
+    marginBottom: 20,
+  },
+  captureBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 4,
+    padding: 4,
+  },
+  captureInner: { flex: 1, borderRadius: 36 },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  permissionText: {
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
+    marginVertical: 24,
+  },
+  btn: { paddingHorizontal: 32, paddingVertical: 18, borderRadius: 18 },
+  btnText: { color: 'white', fontWeight: '800', fontSize: 16 },
+  cancelBtn: { marginTop: 24 },
+});

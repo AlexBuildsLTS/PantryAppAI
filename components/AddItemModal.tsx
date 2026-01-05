@@ -1,228 +1,249 @@
+/**
+ * @file AddItemModal.tsx
+ * @description senior-level verification workflow for inventory items.
+ * Corrected: Fixed Reanimated 3 animation exports and removed unused variables.
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  StyleSheet,
   Modal,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  Alert,
+  ScrollView,
   Platform,
   KeyboardAvoidingView,
+  ActivityIndicator,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { supabase } from '@/services/supabase';
-import { useAuth } from '@/contexts/AuthContext';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { SlideInUp } from 'react-native-reanimated'; // FIXED: Correct member name
 
-interface Props {
-  visible: boolean;
+// Internal Systems
+import { useTheme } from '../contexts/ThemeContext';
+import { FoodItemRepository } from '../services/repositories/FoodItemRepository';
+import { useAuth } from '../contexts/AuthContext';
+
+interface AddItemModalProps {
+  isVisible: boolean;
   onClose: () => void;
-  onRefresh: () => void;
+  initialData?: any;
 }
 
-export function AddItemModal({ visible, onClose, onRefresh }: Props) {
-  const { user } = useAuth();
-  const [name, setName] = useState('');
-  const [location, setLocation] = useState<'pantry' | 'fridge' | 'freezer'>(
-    'pantry'
-  );
-  const [loading, setLoading] = useState(false);
+export default function AddItemModal({
+  isVisible,
+  onClose,
+  initialData,
+}: AddItemModalProps) {
+  const { colors } = useTheme();
+  const { user, household } = useAuth();
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Animation Values
-  const translateY = useSharedValue(600);
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
+  // Form State
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [unit, setUnit] = useState('pcs');
+  const [category, setCategory] = useState('Pantry');
+  const [expiryDate, setExpiryDate] = useState('');
 
   useEffect(() => {
-    if (visible) {
-      translateY.value = withSpring(0, { damping: 15 });
-    } else {
-      translateY.value = withTiming(600);
+    if (initialData) {
+      setName(initialData.name || '');
+      setQuantity(initialData.quantity?.toString() || '1');
+      setUnit(initialData.unit || 'pcs');
+      setCategory(initialData.category || 'Pantry');
     }
-  }, [visible]);
+  }, [initialData]);
 
-  const handleAdd = async () => {
-    if (!name) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      return Alert.alert('Missing Info', 'What are we adding to the pantry?');
-    }
-
-    setLoading(true);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+  const handleSave = async () => {
+    if (!name || isSaving) return;
 
     try {
-      // 1. Get the household (Optimized: we could also store this in AuthContext)
-      const { data: memberData } = await supabase
-        .from('household_members')
-        .select('household_id')
-        .eq('user_id', user?.id)
-        .single();
+      setIsSaving(true);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-      if (!memberData) throw new Error('Join a household to add items.');
-
-      // 2. Insert into Supabase
-      const { error } = await supabase.from('pantry_items').insert({
+      await FoodItemRepository.addItem({
         name,
-        location,
-        household_id: memberData.household_id,
+        quantity: parseFloat(quantity),
+        unit,
+        category,
+        expiry_date: expiryDate || null,
+        household_id: household?.id,
         added_by: user?.id,
         status: 'fresh',
-      });
+      } as any);
 
-      if (error) throw error;
-
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setName('');
-      onRefresh();
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       onClose();
-    } catch (error: any) {
-      Alert.alert('Database Error', error.message);
+
+      // Reset State
+      setName('');
+      setExpiryDate('');
+    } catch (error) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
-      setLoading(false);
+      setIsSaving(false);
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="none">
-      <View style={styles.container}>
-        {/* Tap background to close */}
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        >
-          <BlurView intensity={30} style={StyleSheet.absoluteFill} />
-        </TouchableOpacity>
-
+    <Modal visible={isVisible} animationType="fade" transparent>
+      <BlurView intensity={60} tint="dark" style={styles.overlay}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.container}
         >
-          <Animated.View style={[styles.sheet, animatedStyle]}>
-            <View style={styles.handle} />
-
-            <Text style={styles.title}>New Item</Text>
-
-            <View style={styles.inputContainer}>
-              <Feather
-                name="shopping-bag"
-                size={20}
-                color="#666"
-                style={styles.icon}
-              />
-              <TextInput
-                style={styles.input}
-                placeholder="Item name..."
-                placeholderTextColor="#666"
-                value={name}
-                onChangeText={setName}
-                autoFocus
-              />
-            </View>
-
-            <Text style={styles.label}>Storage Location</Text>
-            <View style={styles.selector}>
-              {['pantry', 'fridge', 'freezer'].map((loc) => (
-                <TouchableOpacity
-                  key={loc}
-                  onPress={() => setLocation(loc as any)}
-                  style={[
-                    styles.option,
-                    location === loc && styles.activeOption,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      location === loc && styles.activeOptionText,
-                    ]}
-                  >
-                    {loc.charAt(0).toUpperCase() + loc.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              style={[styles.saveButton, loading && { opacity: 0.7 }]}
-              onPress={handleAdd}
-              disabled={loading}
-            >
-              <Text style={styles.saveButtonText}>
-                {loading ? 'Syncing...' : 'Add to Inventory'}
+          <Animated.View
+            entering={SlideInUp.springify().damping(15)} // FIXED: SlideInUp
+            style={[
+              styles.content,
+              { backgroundColor: colors.surface, borderColor: colors.border },
+            ]}
+          >
+            <View style={styles.header}>
+              <Text style={[styles.title, { color: colors.text }]}>
+                Add to Inventory
               </Text>
-            </TouchableOpacity>
+              <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+                <Feather name="x" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={styles.label}>ITEM NAME</Text>
+              <View style={[styles.inputBox, { borderColor: colors.border }]}>
+                <MaterialCommunityIcons
+                  name="food-apple"
+                  size={20}
+                  color={colors.primary}
+                />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="e.g. Organic Milk"
+                  placeholderTextColor={colors.textSecondary}
+                  value={name}
+                  onChangeText={setName}
+                />
+              </View>
+
+              <View style={styles.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>QUANTITY</Text>
+                  <View
+                    style={[styles.inputBox, { borderColor: colors.border }]}
+                  >
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      keyboardType="numeric"
+                      value={quantity}
+                      onChangeText={setQuantity}
+                    />
+                  </View>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.label}>UNIT</Text>
+                  <View
+                    style={[styles.inputBox, { borderColor: colors.border }]}
+                  >
+                    <TextInput
+                      style={[styles.input, { color: colors.text }]}
+                      value={unit}
+                      onChangeText={setUnit}
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.label}>EXPIRATION (YYYY-MM-DD)</Text>
+              <View style={[styles.inputBox, { borderColor: colors.border }]}>
+                <Feather
+                  name="calendar"
+                  size={18}
+                  color={colors.textSecondary}
+                />
+                <TextInput
+                  style={[styles.input, { color: colors.text }]}
+                  placeholder="2026-05-20"
+                  placeholderTextColor={colors.textSecondary}
+                  value={expiryDate}
+                  onChangeText={setExpiryDate}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={styles.saveBtnText}>Confirm & Add</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={{ height: 40 }} />
+            </ScrollView>
           </Animated.View>
         </KeyboardAvoidingView>
-      </View>
+      </BlurView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFillObject },
-  sheet: {
-    backgroundColor: '#1A1A1A',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
-    padding: 24,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+  overlay: { flex: 1, justifyContent: 'flex-end' },
+  container: { width: '100%' },
+  content: {
+    borderTopLeftRadius: 40,
+    borderTopRightRadius: 40,
     borderWidth: 1,
-    borderColor: '#333',
+    padding: 32,
+    maxHeight: '90%',
   },
-  handle: {
-    width: 40,
-    height: 5,
-    backgroundColor: '#333',
-    borderRadius: 10,
-    alignSelf: 'center',
-    marginBottom: 20,
-  },
-  title: { fontSize: 24, fontWeight: 'bold', color: '#FFF', marginBottom: 25 },
-  label: { color: '#999', fontSize: 14, marginBottom: 10, fontWeight: '600' },
-  inputContainer: {
+  header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#262626',
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    marginBottom: 25,
-    height: 60,
+    marginBottom: 32,
   },
-  icon: { marginRight: 12 },
-  input: { flex: 1, color: '#FFF', fontSize: 16 },
-  selector: { flexDirection: 'row', gap: 10, marginBottom: 30 },
-  option: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: 12,
-    backgroundColor: '#262626',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#333',
-  },
-  activeOption: { backgroundColor: '#22C55E', borderColor: '#22C55E' },
-  optionText: { color: '#999', fontWeight: '600' },
-  activeOptionText: { color: '#FFF' },
-  saveButton: {
-    backgroundColor: '#22C55E',
-    height: 60,
-    borderRadius: 15,
+  title: { fontSize: 24, fontWeight: '900', letterSpacing: -0.5 },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.05)',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#22C55E',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
   },
-  saveButtonText: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
+  label: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: 'rgba(255,255,255,0.3)',
+    letterSpacing: 1.5,
+    marginBottom: 12,
+    marginTop: 24,
+  },
+  inputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 60,
+    borderRadius: 18,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  input: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: '600' },
+  row: { flexDirection: 'row', gap: 16 },
+  saveBtn: {
+    height: 64,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 40,
+  },
+  saveBtnText: { color: 'white', fontSize: 18, fontWeight: '800' },
 });

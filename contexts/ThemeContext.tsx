@@ -1,28 +1,39 @@
-import React, { createContext, useContext, ReactNode } from 'react';
+/**
+ * @file ThemeContext.tsx
+ * @description Fixed: Added isDark helper for logic consistency.
+ */
+import React, { createContext, useContext, useState } from 'react';
+import { theme as defaultTheme, Theme } from '../styles/theme';
 
-// This matches the design you want
-export const theme = {
-  colors: {
-    primary: '#6366F1',
-    secondary: '#94A3B8',
-    background: '#0F172A',
-    surface: '#1E293B',
-    text: '#F8FAFC',
-    textSecondary: '#94A3B8',
-    success: '#22C55E',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    border: '#334155',
-  },
-};
+interface ThemeContextType {
+  theme: Theme;
+  colors: Theme['colors'];
+  mode: 'dark' | 'light';
+  isDark: boolean; // ADDED THIS
+  toggleTheme: () => void;
+}
 
-type ThemeContextType = typeof theme;
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const ThemeContext = createContext<ThemeContextType | null>(null);
+export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
+  children,
+}) => {
+  const [mode, setMode] = useState<'dark' | 'light'>('dark');
 
-export const ThemeProvider = ({ children }: { children: ReactNode }) => {
+  const toggleTheme = () => setMode((m) => (m === 'dark' ? 'light' : 'dark'));
+
   return (
-    <ThemeContext.Provider value={theme}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider
+      value={{
+        theme: defaultTheme,
+        colors: defaultTheme.colors,
+        mode,
+        isDark: mode === 'dark', // ADDED THIS
+        toggleTheme,
+      }}
+    >
+      {children}
+    </ThemeContext.Provider>
   );
 };
 

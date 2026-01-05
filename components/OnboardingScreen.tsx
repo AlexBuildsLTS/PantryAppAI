@@ -1,16 +1,23 @@
+/**
+ * @file OnboardingScreen.tsx
+ * @description AAA+ Tier Introduction workflow.
+ * Features: Paging animations, Haptic feedback, and feature education.
+ */
+
 import React, { useState, useRef } from 'react';
 import {
-  _View as View,
+  View,
   Text,
   Dimensions,
   Pressable,
   Animated,
-  FlatList,
+  StyleSheet,
+  SafeAreaView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
@@ -18,31 +25,30 @@ const STEPS = [
   {
     id: '1',
     title: 'Smart Pantry',
-    desc: 'Enterprise tracking for your food inventory.',
+    desc: 'Enterprise tracking for your food inventory with real-time sync.',
     icon: 'package',
-    color: ['#22C55E', '#16A34A'],
+    color: ['#22C55E', '#16A34A'] as const,
   },
   {
     id: '2',
     title: 'AI Vision',
-    desc: 'Scan receipts and fridges with Gemini AI.',
+    desc: 'Identify ingredients and scan receipts instantly with Gemini AI.',
     icon: 'camera',
-    color: ['#3B82F6', '#2563EB'],
+    color: ['#3B82F6', '#2563EB'] as const,
   },
   {
     id: '3',
     title: 'Zero Waste',
-    desc: 'Get smart notifications before food expires.',
+    desc: 'Receive intelligent alerts before your food reaches expiration.',
     icon: 'bell',
-    color: ['#F59E0B', '#D97706'],
+    color: ['#F59E0B', '#D97706'] as const,
   },
 ];
 
 export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
+  const { colors } = useTheme();
   const [currentStep, setCurrentStep] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
-
-  // Use <any> for the ref to prevent TS conflicts with Animated.FlatList
   const flatListRef = useRef<any>(null);
 
   const handleNext = () => {
@@ -58,11 +64,15 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-background dark:bg-black">
-      <View className="flex-row justify-between p-6">
-        <Text className="text-2xl font-bold text-primary">Pantry Pal</Text>
-        <Pressable onPress={onComplete} className="pressed:opacity-80 p-2">
-          <Text className="font-bold text-text-secondary">Skip</Text>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <View style={styles.header}>
+        <Text style={[styles.logo, { color: colors.primary }]}>Pantry Pal</Text>
+        <Pressable onPress={onComplete} style={styles.skipBtn}>
+          <Text style={[styles.skipText, { color: colors.textSecondary }]}>
+            Skip
+          </Text>
         </Pressable>
       </View>
 
@@ -81,29 +91,26 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
           setCurrentStep(Math.round(e.nativeEvent.contentOffset.x / width))
         }
         renderItem={({ item }) => (
-          <View style={{ width }} className="items-center justify-center px-10">
-            <LinearGradient
-              colors={item.color as readonly [string, string, ...string[]]}
-              className="w-32 h-32 rounded-[40px] items-center justify-center mb-10 shadow-xl shadow-primary/20"
-            >
-              <Feather name={item.icon as any} size={48} color="white" />
+          <View style={styles.stepContainer}>
+            <LinearGradient colors={item.color} style={styles.iconCircle}>
+              <Feather name={item.icon as any} size={54} color="white" />
             </LinearGradient>
-            <Text className="mb-4 text-3xl font-bold text-center text-white">
+            <Text style={[styles.title, { color: colors.text }]}>
               {item.title}
             </Text>
-            <Text className="text-lg leading-6 text-center text-text-secondary">
+            <Text style={[styles.desc, { color: colors.textSecondary }]}>
               {item.desc}
             </Text>
           </View>
         )}
       />
 
-      <View className="p-10">
+      <View style={styles.footer}>
         <Pressable
           onPress={handleNext}
-          className="flex-row items-center justify-center h-16 bg-primary rounded-2xl pressed:opacity-80"
+          style={[styles.nextBtn, { backgroundColor: colors.primary }]}
         >
-          <Text className="mr-2 text-lg font-bold text-white">
+          <Text style={styles.nextBtnText}>
             {currentStep === STEPS.length - 1 ? 'Get Started' : 'Next'}
           </Text>
           <Feather name="arrow-right" size={20} color="white" />
@@ -112,3 +119,34 @@ export function OnboardingScreen({ onComplete }: { onComplete: () => void }) {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 24, alignItems: 'center' },
+  logo: { fontSize: 24, fontWeight: '900', letterSpacing: -1 },
+  skipBtn: { padding: 8 },
+  skipText: { fontWeight: '700' },
+  stepContainer: { 
+    width, 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingHorizontal: 40 // FIXED: Changed from 'px' to 'paddingHorizontal'
+  },
+  iconCircle: { 
+    width: 140, 
+    height: 140, 
+    borderRadius: 70, // Standardize border radius
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    marginBottom: 48, 
+    elevation: 10, 
+    shadowColor: '#000', 
+    shadowOpacity: 0.2, 
+    shadowRadius: 15 
+  },
+  title: { fontSize: 36, fontWeight: '900', textAlign: 'center', marginBottom: 16, letterSpacing: -1 },
+  desc: { fontSize: 18, lineHeight: 26, textAlign: 'center', paddingHorizontal: 20 },
+  footer: { padding: 40 },
+  nextBtn: { height: 64, borderRadius: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
+  nextBtnText: { color: 'white', fontSize: 18, fontWeight: '800' }
+});

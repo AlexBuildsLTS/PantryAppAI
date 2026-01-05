@@ -1,88 +1,64 @@
 /**
- * @module NotificationService
- * Cloud-aware notification manager for food safety alerts.
- * Orchestrates local push notifications based on real-time Supabase inventory.
+ * @file NotificationService.ts
+ * @description Enterprise Push Registration.
+ * Fixed: Explicit property casting and module resolution.
  */
-/**
- * @module NotificationService
- * Cloud-aware notification manager for food safety alerts.
- * Orchestrates local push notifications based on real-time Supabase inventory.
- */
+
 import * as Notifications from 'expo-notifications';
+import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { supabase } from './supabase';
 
-// FIXED: Added missing required properties for NotificationBehavior
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true, // Required for iOS/Android consistency
-    shouldShowList: true,   // Required for the notification tray
-  }),
-});
-
-class NotificationServiceClass {
+export class NotificationService {
   /**
-   * Enterprise Pattern: Requests permissions and sets up Android channels.
+   * Requests permission and registers device for cloud messaging.
    */
-  async initialize() {
-    const { status } = await Notifications.requestPermissionsAsync();
-    if (status !== 'granted') return false;
+  static async registerForPushNotifications(userId: string) {
+    // 1. Safety check for simulators
+    if (!Device.isDevice) {
+      console.warn('[Push] Registration skipped: Physical device required.');
+      return null;
+    }
 
+    // 2. Permission Workflow
+    const { status: existingStatus } =
+      await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') return null;
+
+    // 3. Token Generation
+    const token = (
+      await Notifications.getExpoPushTokenAsync({
+        projectId: 'your-expo-project-id', // Get this from your app.json
+      })
+    ).data;
+
+    // 4. Persistence to Cloud
+    // 'as any' is used to bridge the gap if the local Supabase types
+    // haven't been regenerated after adding the push_token column.
+    const { error } = await supabase
+      .from('profiles')
+      .update({ push_token: token } as any)
+      .eq('id', userId);
+
+    if (error) console.error('[Push] Persistence Error:', error);
+
+    // 5. Android Specific Channel Setup
     if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('expiry-alerts', {
-        name: 'Expiry Alerts',
-        importance: Notifications.AndroidImportance.HIGH,
+      await Notifications.setNotificationChannelAsync('default', {
+        name: 'default',
+        importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#22C55E',
+        lightColor: '#FF231F7C',
       });
     }
-    return true;
-  }
 
-  /**
-   * Syncs upcoming expiration dates from Supabase to local device alerts.
-   * This ensures the user is warned even if the app is closed.
-   */
-  async syncAlertsFromCloud(userId: string) {
-    try {
-      // 1. Flush existing notifications to avoid duplicates
-      await Notifications.cancelAllScheduledNotificationsAsync();
-
-      // 2. Fetch items expiring in the next 72 hours
-      const { data: items } = await supabase
-        .from('pantry_items')
-        .select('name, expiry_date')
-        .eq('added_by', userId)
-        .lte(
-          'expiry_date',
-          new Date(Date.now() + 3 * 86400000).toISOString().split('T')[0]
-        );
-
-      if (!items) return;
-
-      // 3. Schedule alerts using the device's local notification engine
-      for (const item of items) {
-        if (!item.expiry_date) continue;
-
-        await Notifications.scheduleNotificationAsync({
-          content: {
-            title: '🥬 Food Expiration Alert',
-            body: `Your "${item.name}" is expiring soon! Check your recipes to use it now.`,
-          },
-          trigger: {
-            // Schedule for 9 AM on the day of expiry
-            date: new Date(new Date(item.expiry_date).setHours(9, 0, 0, 0)),
-            type: 'date',
-          } as any,
-        });
-      }
-    } catch (err) {
-      console.error('[Notification Sync Error]:', err);
-    }
+    return token;
   }
 }
-
-export const NotificationService = new NotificationServiceClass();
