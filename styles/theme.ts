@@ -1,4 +1,9 @@
-// TypeScript interfaces for type safety and better IntelliSense
+/**
+ * @file theme.ts
+ * @description Master design system for Pantry Pal.
+ * Features high-end glassmorphism presets and a modern slate-green palette.
+ */
+
 export interface ThemeColors {
   primary: string;
   background: string;
@@ -6,6 +11,9 @@ export interface ThemeColors {
   success: string;
   warning: string;
   error: string;
+  text: string;
+  textSecondary: string;
+  border: string;
 }
 
 export interface GlassTheme {
@@ -19,24 +27,24 @@ export interface Theme {
   glass: GlassTheme;
 }
 
-// Define the theme object with improved structure
 const _theme: Theme = {
-  // Color palette for consistent UI theming
   colors: {
-    primary: '#22C55E', // Green primary color
+    primary: '#22C55E', // Green primary
     background: '#0F172A', // Dark slate background
-    surface: '#1E293B', // Lighter surface color
-    success: '#22C55E', // Same as primary for success states
-    warning: '#F59E0B', // Amber for warnings
-    error: '#EF4444', // Red for errors
+    surface: '#1E293B', // Slate surface
+    success: '#22C55E', // Emerald success
+    warning: '#F59E0B', // Amber warning
+    error: '#EF4444', // Red error
+    text: '#FFFFFF',
+    textSecondary: '#94A3B8',
+    border: 'rgba(255, 255, 255, 0.1)',
   },
-  // High-end glassmorphism presets for modern UI effects
   glass: {
-    intensity: 20, // Blur intensity value
-    borderColor: 'rgba(255, 255, 255, 0.1)', // Semi-transparent white border
-    backgroundColor: 'rgba(30, 41, 59, 0.7)', // Semi-transparent slate background
+    intensity: 20,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(30, 41, 59, 0.7)',
   },
 };
 
-// Freeze the theme object to prevent accidental mutations
 export const theme = Object.freeze(_theme);
+export type AppTheme = typeof _theme;

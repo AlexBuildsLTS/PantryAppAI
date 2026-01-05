@@ -14,23 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          badge_url: string | null
+          code: string | null
+          description: string | null
+          id: string
+          points: number | null
+          title: string
+        }
+        Insert: {
+          badge_url?: string | null
+          code?: string | null
+          description?: string | null
+          id?: string
+          points?: number | null
+          title: string
+        }
+        Update: {
+          badge_url?: string | null
+          code?: string | null
+          description?: string | null
+          id?: string
+          points?: number | null
+          title?: string
+        }
+        Relationships: []
+      }
       household_members: {
         Row: {
           household_id: string | null
           id: string
           joined_at: string | null
+          member_role: Database["public"]["Enums"]["user_role"] | null
           user_id: string | null
         }
         Insert: {
           household_id?: string | null
           id?: string
           joined_at?: string | null
+          member_role?: Database["public"]["Enums"]["user_role"] | null
           user_id?: string | null
         }
         Update: {
           household_id?: string | null
           id?: string
           joined_at?: string | null
+          member_role?: Database["public"]["Enums"]["user_role"] | null
           user_id?: string | null
         }
         Relationships: [
@@ -54,23 +84,29 @@ export type Database = {
         Row: {
           created_at: string | null
           created_by: string | null
+          currency: string | null
           id: string
+          invite_code: string | null
           name: string
-          subscription_status: string | null
+          waste_reduction_target: number | null
         }
         Insert: {
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           id?: string
+          invite_code?: string | null
           name: string
-          subscription_status?: string | null
+          waste_reduction_target?: number | null
         }
         Update: {
           created_at?: string | null
           created_by?: string | null
+          currency?: string | null
           id?: string
+          invite_code?: string | null
           name?: string
-          subscription_status?: string | null
+          waste_reduction_target?: number | null
         }
         Relationships: [
           {
@@ -84,28 +120,40 @@ export type Database = {
       }
       inventory_logs: {
         Row: {
-          action_type: string | null
+          action: Database["public"]["Enums"]["action_type"]
+          co2_impact: number | null
+          financial_impact: number | null
           household_id: string | null
           id: string
           item_id: string | null
           logged_at: string | null
-          quantity: number | null
+          notes: string | null
+          quantity_delta: number | null
+          user_id: string | null
         }
         Insert: {
-          action_type?: string | null
+          action: Database["public"]["Enums"]["action_type"]
+          co2_impact?: number | null
+          financial_impact?: number | null
           household_id?: string | null
           id?: string
           item_id?: string | null
           logged_at?: string | null
-          quantity?: number | null
+          notes?: string | null
+          quantity_delta?: number | null
+          user_id?: string | null
         }
         Update: {
-          action_type?: string | null
+          action?: Database["public"]["Enums"]["action_type"]
+          co2_impact?: number | null
+          financial_impact?: number | null
           household_id?: string | null
           id?: string
           item_id?: string | null
           logged_at?: string | null
-          quantity?: number | null
+          notes?: string | null
+          quantity_delta?: number | null
+          user_id?: string | null
         }
         Relationships: [
           {
@@ -115,62 +163,100 @@ export type Database = {
             referencedRelation: "households"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "inventory_logs_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "pantry_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_logs_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pantry_items: {
         Row: {
           added_by: string | null
+          ai_confidence_score: number | null
+          barcode: string | null
           brand: string | null
           category: string | null
+          cost_per_unit: number | null
           created_at: string | null
           expiry_date: string | null
           household_id: string | null
           id: string
           image_url: string | null
-          is_favorite: boolean | null
-          location: Database["public"]["Enums"]["storage_type"] | null
-          metadata: Json | null
+          initial_quantity: number | null
+          is_opened: boolean | null
           name: string
-          quantity: number | null
+          nutritional_info: Json | null
+          opened_at: string | null
+          purchase_date: string | null
+          quantity: number
           status: Database["public"]["Enums"]["item_status"] | null
+          storage_id: string | null
           unit: string | null
           updated_at: string | null
+          vision_metadata: Json | null
+          weight_grams: number | null
         }
         Insert: {
           added_by?: string | null
+          ai_confidence_score?: number | null
+          barcode?: string | null
           brand?: string | null
           category?: string | null
+          cost_per_unit?: number | null
           created_at?: string | null
           expiry_date?: string | null
           household_id?: string | null
           id?: string
           image_url?: string | null
-          is_favorite?: boolean | null
-          location?: Database["public"]["Enums"]["storage_type"] | null
-          metadata?: Json | null
+          initial_quantity?: number | null
+          is_opened?: boolean | null
           name: string
-          quantity?: number | null
+          nutritional_info?: Json | null
+          opened_at?: string | null
+          purchase_date?: string | null
+          quantity?: number
           status?: Database["public"]["Enums"]["item_status"] | null
+          storage_id?: string | null
           unit?: string | null
           updated_at?: string | null
+          vision_metadata?: Json | null
+          weight_grams?: number | null
         }
         Update: {
           added_by?: string | null
+          ai_confidence_score?: number | null
+          barcode?: string | null
           brand?: string | null
           category?: string | null
+          cost_per_unit?: number | null
           created_at?: string | null
           expiry_date?: string | null
           household_id?: string | null
           id?: string
           image_url?: string | null
-          is_favorite?: boolean | null
-          location?: Database["public"]["Enums"]["storage_type"] | null
-          metadata?: Json | null
+          initial_quantity?: number | null
+          is_opened?: boolean | null
           name?: string
-          quantity?: number | null
+          nutritional_info?: Json | null
+          opened_at?: string | null
+          purchase_date?: string | null
+          quantity?: number
           status?: Database["public"]["Enums"]["item_status"] | null
+          storage_id?: string | null
           unit?: string | null
           updated_at?: string | null
+          vision_metadata?: Json | null
+          weight_grams?: number | null
         }
         Relationships: [
           {
@@ -187,6 +273,13 @@ export type Database = {
             referencedRelation: "households"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pantry_items_storage_id_fkey"
+            columns: ["storage_id"]
+            isOneToOne: false
+            referencedRelation: "storage_locations"
+            referencedColumns: ["id"]
+          },
         ]
       }
       profiles: {
@@ -196,9 +289,16 @@ export type Database = {
           full_name: string | null
           id: string
           is_onboarded: boolean | null
+          preferred_language: string | null
+          push_notifications_enabled: boolean | null
           role: Database["public"]["Enums"]["user_role"] | null
+          sustainability_score: number | null
+          tier: Database["public"]["Enums"]["sub_tier"] | null
+          total_co2_saved_kg: number | null
+          total_savings_usd: number | null
           updated_at: string | null
           username: string | null
+          waste_percentage: number | null
         }
         Insert: {
           avatar_url?: string | null
@@ -206,9 +306,16 @@ export type Database = {
           full_name?: string | null
           id: string
           is_onboarded?: boolean | null
+          preferred_language?: string | null
+          push_notifications_enabled?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          sustainability_score?: number | null
+          tier?: Database["public"]["Enums"]["sub_tier"] | null
+          total_co2_saved_kg?: number | null
+          total_savings_usd?: number | null
           updated_at?: string | null
           username?: string | null
+          waste_percentage?: number | null
         }
         Update: {
           avatar_url?: string | null
@@ -216,11 +323,198 @@ export type Database = {
           full_name?: string | null
           id?: string
           is_onboarded?: boolean | null
+          preferred_language?: string | null
+          push_notifications_enabled?: boolean | null
           role?: Database["public"]["Enums"]["user_role"] | null
+          sustainability_score?: number | null
+          tier?: Database["public"]["Enums"]["sub_tier"] | null
+          total_co2_saved_kg?: number | null
+          total_savings_usd?: number | null
           updated_at?: string | null
           username?: string | null
+          waste_percentage?: number | null
         }
         Relationships: []
+      }
+      shopping_list: {
+        Row: {
+          created_at: string | null
+          household_id: string | null
+          id: string
+          is_completed: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          household_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          household_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
+      shopping_list_items: {
+        Row: {
+          category: string
+          added_by: string | null
+          created_at: string | null
+          id: string
+          is_bought: boolean | null
+          list_id: string | null
+          name: string
+          quantity: number | null
+          suggested_item_id: string | null
+        }
+        Insert: {
+          added_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_bought?: boolean | null
+          list_id?: string | null
+          name: string
+          quantity?: number | null
+          suggested_item_id?: string | null
+        }
+        Update: {
+          added_by?: string | null
+          created_at?: string | null
+          id?: string
+          is_bought?: boolean | null
+          list_id?: string | null
+          name?: string
+          quantity?: number | null
+          suggested_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_list_items_added_by_fkey"
+            columns: ["added_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_list_items_list_id_fkey"
+            columns: ["list_id"]
+            isOneToOne: false
+            referencedRelation: "shopping_lists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shopping_list_items_suggested_item_id_fkey"
+            columns: ["suggested_item_id"]
+            isOneToOne: false
+            referencedRelation: "pantry_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shopping_lists: {
+        Row: {
+          created_at: string | null
+          household_id: string | null
+          id: string
+          is_completed: boolean | null
+          name: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          household_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          name?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          household_id?: string | null
+          id?: string
+          is_completed?: boolean | null
+          name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shopping_lists_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      storage_locations: {
+        Row: {
+          created_at: string | null
+          household_id: string | null
+          id: string
+          is_default: boolean | null
+          location_type: string | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          household_id?: string | null
+          id?: string
+          is_default?: boolean | null
+          location_type?: string | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          household_id?: string | null
+          id?: string
+          is_default?: boolean | null
+          location_type?: string | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "storage_locations_household_id_fkey"
+            columns: ["household_id"]
+            isOneToOne: false
+            referencedRelation: "households"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_achievements: {
+        Row: {
+          achievement_id: string
+          unlocked_at: string | null
+          user_id: string
+        }
+        Insert: {
+          achievement_id: string
+          unlocked_at?: string | null
+          user_id: string
+        }
+        Update: {
+          achievement_id?: string
+          unlocked_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_achievements_achievement_id_fkey"
+            columns: ["achievement_id"]
+            isOneToOne: false
+            referencedRelation: "achievements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_achievements_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -230,9 +524,19 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      item_status: "fresh" | "expiring" | "expired" | "consumed" | "wasted"
+      action_type:
+        | "added"
+        | "consumed"
+        | "wasted"
+        | "edited"
+        | "restocked"
+        | "expired"
+      app_role: "admin" | "moderator" | "member"
+      item_status: "fresh" | "expiring_soon" | "expired" | "consumed" | "wasted"
       storage_type: "pantry" | "fridge" | "freezer" | "other"
-      user_role: "admin" | "moderator" | "premium" | "member"
+      sub_tier: "free" | "premium" | "pro"
+      subscription_tier: "free" | "premium" | "pro"
+      user_role: "admin" | "moderator" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -360,9 +664,20 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      item_status: ["fresh", "expiring", "expired", "consumed", "wasted"],
+      action_type: [
+        "added",
+        "consumed",
+        "wasted",
+        "edited",
+        "restocked",
+        "expired",
+      ],
+      app_role: ["admin", "moderator", "member"],
+      item_status: ["fresh", "expiring_soon", "expired", "consumed", "wasted"],
       storage_type: ["pantry", "fridge", "freezer", "other"],
-      user_role: ["admin", "moderator", "premium", "member"],
+      sub_tier: ["free", "premium", "pro"],
+      subscription_tier: ["free", "premium", "pro"],
+      user_role: ["admin", "moderator", "member"],
     },
   },
 } as const
