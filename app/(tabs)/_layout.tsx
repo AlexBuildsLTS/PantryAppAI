@@ -1,12 +1,11 @@
 /**
  * @file _layout.tsx
- * @description Master AAA+ Tier Tab Orchestrator.
- * Features:
- * - Hard Authentication Guard (Redirects unauthenticated users)
- * - Glassmorphic BlurView Navigation
- * - Haptic Selection Feedback
- * - Real-time Profile Hydration Check
- * @author Pantry Pal Engineering
+ * @description Master Tab Navigation & Authentication Orchestrator.
+ * * AAA+ DESIGN PATTERNS:
+ * 1. Hard Authentication Guard: Enforces session-only access.
+ * 2. Hydration Management: Prevents "Ghost Profiles" via strict loading states.
+ * 3. Haptic Integration: Native tactile feedback on tab transitions.
+ * 4. Glassmorphic UI: High-fidelity BlurView orchestration for iOS.
  */
 
 import React, { useEffect } from 'react';
@@ -16,19 +15,19 @@ import { Platform, StyleSheet, View, ActivityIndicator } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-// Internal Systems
+// Internal System Contexts
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function TabLayout() {
-  const { colors, mode } = useTheme();
+  const { colors, isDark } = useTheme();
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const isDark = mode === 'dark';
 
   /**
-   * AAA+ AUTHENTICATION GUARD
-   * Prevents "Ghost Sessions" by redirecting to Sign-In if no user is found.
+   * MODULE 1: AUTHENTICATION ENFORCEMENT
+   * Description: Redirects unauthenticated users to the login flow immediately
+   * upon session expiration or invalid state.
    */
   useEffect(() => {
     if (!isLoading && !user) {
@@ -37,15 +36,18 @@ export default function TabLayout() {
   }, [user, isLoading, router]);
 
   /**
-   * Selection Haptic Handler
+   * MODULE 2: HAPTIC FEEDBACK ORCHESTRATOR
+   * Description: Triggers selection-style vibration to match native iOS/Android
+   * system behavior for premium user experience.
    */
   const handleTabPress = () => {
     Haptics.selectionAsync();
   };
 
   /**
-   * SKELETON LOADER
-   * Prevents the "Chef Member" UI flickers during metadata hydration.
+   * MODULE 3: HYDRATION GUARD (SKELETON)
+   * Description: Blocks the rendering of the tab bar and sub-screens until
+   * Supabase Auth has finished profile lookup to prevent "Chef Member" UI ghosting.
    */
   if (isLoading) {
     return (
@@ -61,7 +63,10 @@ export default function TabLayout() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
-        // Premium glassmorphic tab bar styling
+
+        // MODULE 4: PREMIUM NAVIGATION STYLING
+        // Description: Implements absolute positioning for the tab bar to
+        // enable background transparency and blurred layering.
         tabBarStyle: {
           position: 'absolute',
           borderTopWidth: 0,
@@ -72,7 +77,10 @@ export default function TabLayout() {
           borderTopColor: colors.border,
           paddingBottom: Platform.OS === 'ios' ? 30 : 10,
         },
-        // Background blur for high-end visual fidelity
+
+        // MODULE 5: GLASSMORPHIC EFFECT ENGINE
+        // Description: Only active on iOS. Provides an intensity-controlled
+        // blur that adapts to the current system theme (Dark/Light).
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (
             <BlurView
@@ -81,6 +89,7 @@ export default function TabLayout() {
               style={StyleSheet.absoluteFill}
             />
           ) : null,
+
         tabBarLabelStyle: {
           fontSize: 10,
           fontWeight: '900',
@@ -89,7 +98,7 @@ export default function TabLayout() {
         },
       }}
     >
-      {/* 1. PANTRY (Core Inventory) */}
+      {/* SECTION 1: CORE INVENTORY (PANTRY) */}
       <Tabs.Screen
         name="index"
         options={{
@@ -101,7 +110,7 @@ export default function TabLayout() {
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* 2. SHOPPING (Grocery List Engine) */}
+      {/* SECTION 2: SUPPLY CHAIN LOGISTICS (SHOPPING) */}
       <Tabs.Screen
         name="shopping"
         options={{
@@ -113,7 +122,7 @@ export default function TabLayout() {
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* 3. RECIPES (Chef AI Orchestrator) */}
+      {/* SECTION 3: AI INTELLIGENCE (CHEF AI) */}
       <Tabs.Screen
         name="recipes"
         options={{
@@ -125,7 +134,7 @@ export default function TabLayout() {
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* 4. IMPACT (Analytics Dashboard) */}
+      {/* SECTION 4: SUSTAINABILITY METRICS (IMPACT) */}
       <Tabs.Screen
         name="analytics"
         options={{
@@ -137,27 +146,25 @@ export default function TabLayout() {
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* 5. ALERTS (Notification Hub) */}
+      {/* SECTION 5: REAL-TIME NOTIFICATIONS (ALERTS) */}
       <Tabs.Screen
         name="notifications"
         options={{
           title: 'ALERTS',
           tabBarIcon: ({ color }) => (
-            <View>
-              <Feather name="bell" size={22} color={color} />
-            </View>
+            <Feather name="bell" size={22} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* 6. ACCOUNT (Profile & Household Storage) */}
+      {/* SECTION 6: COMMAND CENTER (ACCOUNT) */}
       <Tabs.Screen
         name="settings"
         options={{
           title: 'ACCOUNT',
           tabBarIcon: ({ color }) => (
-            <Feather name="user" size={22} color={color} />
+            <Feather name="settings" size={22} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -166,6 +173,9 @@ export default function TabLayout() {
   );
 }
 
+/**
+ * MODULE 7: INTERNAL COMPONENT STYLES
+ */
 const styles = StyleSheet.create({
   loader: {
     flex: 1,

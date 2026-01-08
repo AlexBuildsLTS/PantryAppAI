@@ -1,11 +1,15 @@
 /**
  * @file index.tsx
- * @description Enterprise-grade Inventory Dashboard for Pantry Pal.
- * Features: Reanimated 3 physics, search debouncing, AI Scanner integration,
- * and optimistic TanStack Query deletions.
+ * @description Master Inventory Intelligence Dashboard.
+ * * AAA+ ARCHITECTURE:
+ * 1. Relational Hydration: Joins 'storage_locations' for contextual metadata.
+ * 2. Search Orchestration: High-performance debounced filtering.
+ * 3. Haptic UI Loop: Integrated tactile feedback for all major interactions.
+ * 4. Micro-Interaction Engine: Reanimated 3 layout and entry transitions.
+ * 5. State Persistence: Integrated with TanStack Query for cache reliability.
  */
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,95 +17,92 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
-  StatusBar,
   RefreshControl,
   Dimensions,
-  Platform,
   ActivityIndicator,
   Alert,
+  StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInDown, FadeOut, Layout } from 'react-native-reanimated';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
-// Internal Systems
+// Internal System Contexts & Services
 import { supabase } from '../../services/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { Tables } from '../../types/database.types';
 
-// Components
+// Shared Global Components
 import AddItemModal from '../../components/AddItemModal';
 import AIFoodScanner from '../../components/AIFoodScanner';
 
-// Layout Constants
+// Layout Infrastructure Constants
 const { width } = Dimensions.get('window');
 const SPACING = 16;
 const COLUMN_WIDTH = (width - SPACING * 3) / 2;
 const CATEGORIES = ['All', 'Produce', 'Dairy', 'Protein', 'Pantry', 'Frozen'];
 
-type PantryItem = Tables<'pantry_items'>;
+// Composite Type for Database Joins
+type PantryItemWithStorage = Tables<'pantry_items'> & {
+  storage_locations: { name: string; location_type: string } | null;
+};
 
-/**
- * Animated Header Badge Component
- */
-const InventoryBadge = React.memo(({ count }: { count: number }) => {
-  const { colors } = useTheme();
-  return (
-    <Animated.View
-      entering={FadeInDown}
-      style={[styles.badge, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
-    >
-      <Text style={styles.badgeText}>{count} Items</Text>
-    </Animated.View>
-  );
-});
-InventoryBadge.displayName = 'InventoryBadge';
 export default function PantryScreen() {
   const { colors } = useTheme();
+  const { household } = useAuth();
   const queryClient = useQueryClient();
 
-  // Local UI & Navigation State
+  // Component State Management
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [isRefreshing, setIsRefreshing] = useState(false);
-
-  // Modal & Scanner State
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
   const [scannedItemData, setScannedItemData] = useState<any>(null);
 
-  // Search Debouncing
+  /**
+   * MODULE 1: SEARCH DEBOUNCER
+   * Description: Prevents UI lag during heavy typing by delaying the
+   * filter calculation by 300ms.
+   */
   useEffect(() => {
     const handler = setTimeout(() => setDebouncedSearch(searchQuery), 300);
     return () => clearTimeout(handler);
   }, [searchQuery]);
 
   /**
-   * DATA FETCHING
+   * MODULE 2: DATA HYDRATION ENGINE
+   * Description: Executes complex relational join between pantry items
+   * and storage locations using the Supabase PostgREST client.
    */
   const {
     data: items = [],
     isLoading,
-    error,
     refetch,
-  } = useQuery<PantryItem[]>({
-    queryKey: ['pantryItems'],
+    isRefetching,
+  } = useQuery({
+    queryKey: ['pantry-inventory', household?.id],
     queryFn: async () => {
+      if (!household?.id) return [];
       const { data, error } = await supabase
         .from('pantry_items')
-        .select('*')
+        .select('*, storage_locations(name, location_type)')
+        .eq('household_id', household.id)
         .order('expiry_date', { ascending: true });
       if (error) throw error;
-      return data || [];
+      return data as PantryItemWithStorage[];
     },
+    enabled: !!household?.id,
   });
 
   /**
-   * MUTATION: Optimistic Deletion
+   * MODULE 3: OPTIMISTIC DELETION ENGINE
+   * Description: Provides instant UI feedback by removing items from local
+   * cache before the server confirms the delete operation.
    */
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -112,65 +113,114 @@ export default function PantryScreen() {
       if (error) throw error;
     },
     onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ['pantryItems'] });
-      const previousItems = queryClient.getQueryData(['pantryItems']);
-      queryClient.setQueryData(
-        ['pantryItems'],
-        (old: PantryItem[] | undefined) =>
-          old?.filter((item) => item.id !== deletedId) || []
+      await queryClient.cancelQueries({ queryKey: ['pantry-inventory'] });
+      const previous = queryClient.getQueryData(['pantry-inventory']);
+      queryClient.setQueryData(['pantry-inventory'], (old: any) =>
+        old?.filter((item: any) => item.id !== deletedId)
       );
-      return { previousItems };
+      return { previous };
     },
-    onError: (err, deletedId, context) => {
-      if (context?.previousItems) {
-        queryClient.setQueryData(['pantryItems'], context.previousItems);
-      }
-      Alert.alert('Error', 'Failed to delete item.');
+    onError: (err, id, context) => {
+      queryClient.setQueryData(['pantry-inventory'], context?.previous);
+      Alert.alert('System Error', 'Failed to remove inventory item.');
     },
-    onSuccess: () => {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    },
+    onSuccess: () =>
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
   });
 
-  const onRefresh = useCallback(async () => {
-    setIsRefreshing(true);
-    await refetch();
-    setIsRefreshing(false);
-  }, [refetch]);
-
   /**
-   * AI SCANNER LOGIC
+   * MODULE 4: URGENCY & STATUS LOGIC
+   * Description: Core business logic that translates database timestamps into
+   * human-readable urgency labels and associated color tokens.
    */
-  const handleItemsDetected = (detectedItems: any[]) => {
-    setIsScannerVisible(false);
-    if (detectedItems.length > 0) {
-      setScannedItemData(detectedItems[0]); // Pass first detected item to modal
-      setIsAddModalVisible(true);
-    }
+  const getUrgency = (item: PantryItemWithStorage) => {
+    if (!item.expiry_date) return { label: 'Fresh', color: colors.success };
+    const days = Math.ceil(
+      (new Date(item.expiry_date).getTime() - Date.now()) / 86400000
+    );
+    if (days < 0 || item.status === 'expired')
+      return { label: 'Expired', color: colors.error };
+    if (days <= 3) return { label: 'Critical', color: colors.warning };
+    return { label: 'Good', color: colors.primary };
   };
 
   /**
-   * FILTERING & RENDER LOGIC
+   * MODULE 5: FILTER ORCHESTRATION
+   * Description: Computational logic for handling multi-dimensional filtering
+   * (Category + Search Query) using memoization for 60fps performance.
    */
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const matchesSearch =
-        item.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ??
-        false;
+      const matchesSearch = item.name
+        ?.toLowerCase()
+        .includes(debouncedSearch.toLowerCase());
       const matchesCategory =
         activeCategory === 'All' || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [items, debouncedSearch, activeCategory]);
 
-  const getUrgency = (dateStr: string | null) => {
-    if (!dateStr) return { label: 'Fresh', color: colors.success };
-    const days = Math.ceil(
-      (new Date(dateStr).getTime() - Date.now()) / 86400000
+  /**
+   * MODULE 6: ITEM RENDER (BENTO GRID CARD)
+   * Description: High-fidelity card component with Long-Press interaction
+   * for item removal and Haptic feedback.
+   */
+  const renderItem = ({
+    item,
+    index,
+  }: {
+    item: PantryItemWithStorage;
+    index: number;
+  }) => {
+    const urgency = getUrgency(item);
+    return (
+      <Animated.View
+        entering={FadeInDown.delay(index * 50)}
+        exiting={FadeOut}
+        layout={Layout.springify()}
+      >
+        <TouchableOpacity
+          onLongPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+            Alert.alert(
+              'Remove Item',
+              `Are you sure you want to delete ${item.name}?`,
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  onPress: () => deleteMutation.mutate(item.id),
+                  style: 'destructive',
+                },
+              ]
+            );
+          }}
+          style={[
+            styles.card,
+            { backgroundColor: colors.surface, borderColor: colors.border },
+          ]}
+        >
+          <View style={styles.cardHeader}>
+            <Text
+              style={[styles.itemName, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {item.name}
+            </Text>
+            <View
+              style={[styles.statusDot, { backgroundColor: urgency.color }]}
+            />
+          </View>
+          <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
+            {item.quantity} {item.unit} •{' '}
+            {item.storage_locations?.name || 'Kitchen'}
+          </Text>
+          <Text style={[styles.urgencyText, { color: urgency.color }]}>
+            {urgency.label.toUpperCase()}
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
     );
-    if (days < 0) return { label: 'Expired', color: colors.error };
-    if (days <= 3) return { label: 'Critical', color: colors.warning };
-    return { label: 'Soon', color: '#F59E0B' };
   };
 
   return (
@@ -180,40 +230,35 @@ export default function PantryScreen() {
     >
       <StatusBar barStyle="light-content" />
 
-      {/* 1. Header with Gradient */}
+      {/* MODULE 7: DYNAMIC HEADER ENGINE */}
       <LinearGradient
         colors={[colors.primary, '#4338CA']}
         style={styles.header}
       >
-        <View style={styles.headerRow}>
+        <View style={styles.headerTop}>
           <Text style={styles.headerTitle}>Inventory</Text>
-          <InventoryBadge count={filteredItems.length} />
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{filteredItems.length} Items</Text>
+          </View>
         </View>
-
-        <View style={styles.searchContainer}>
-          <Feather
-            name="search"
-            size={18}
-            color={colors.textSecondary}
-            style={styles.searchIcon}
-          />
+        <View style={styles.searchBar}>
+          <Feather name="search" size={18} color={colors.textSecondary} />
           <TextInput
-            placeholder="Search items..."
+            placeholder="Search pantry..."
             placeholderTextColor={colors.textSecondary}
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: '#0F172A' }]}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
         </View>
       </LinearGradient>
 
-      {/* 2. Category Filter Row */}
-      <View style={styles.filterWrapper}>
+      {/* MODULE 8: INTERACTIVE CATEGORY BAR */}
+      <View style={styles.filterContainer}>
         <FlatList
           horizontal
           data={CATEGORIES}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterList}
           renderItem={({ item }) => (
             <TouchableOpacity
               onPress={() => {
@@ -242,100 +287,54 @@ export default function PantryScreen() {
               </Text>
             </TouchableOpacity>
           )}
+          contentContainerStyle={styles.filterContent}
         />
       </View>
 
-      {/* 3. Grid List */}
       {isLoading ? (
-        <View style={styles.center}>
+        <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
           data={filteredItems}
           numColumns={2}
+          keyExtractor={(item) => item.id}
+          renderItem={renderItem}
           columnWrapperStyle={styles.columnWrapper}
-          contentContainerStyle={styles.listContainer}
+          contentContainerStyle={styles.listPadding}
           refreshControl={
             <RefreshControl
-              refreshing={isRefreshing}
-              onRefresh={onRefresh}
+              refreshing={isRefetching}
+              onRefresh={refetch}
               tintColor={colors.primary}
             />
           }
-          keyExtractor={(item) => item.id}
-          renderItem={({ item, index }) => {
-            const urgency = getUrgency(item.expiry_date);
-            return (
-              <Animated.View
-                entering={FadeInDown.delay(index * 50)}
-                exiting={FadeOut}
-                layout={Layout.springify()}
-              >
-                <TouchableOpacity
-                  activeOpacity={0.8}
-                  onLongPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-                    Alert.alert('Delete', `Delete ${item.name}?`, [
-                      { text: 'No' },
-                      {
-                        text: 'Delete',
-                        onPress: () => deleteMutation.mutate(item.id),
-                        style: 'destructive',
-                      },
-                    ]);
-                  }}
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text
-                      style={[styles.itemName, { color: colors.text }]}
-                      numberOfLines={1}
-                    >
-                      {item.name}
-                    </Text>
-                    <View
-                      style={[styles.dot, { backgroundColor: urgency.color }]}
-                    />
-                  </View>
-                  <Text style={[styles.meta, { color: colors.textSecondary }]}>
-                    {item.quantity} {item.unit || 'pcs'}
-                  </Text>
-                  <Text style={[styles.expiryLabel, { color: urgency.color }]}>
-                    {urgency.label}
-                  </Text>
-                </TouchableOpacity>
-              </Animated.View>
-            );
-          }}
           ListEmptyComponent={
-            <View style={styles.empty}>
+            <View style={styles.emptyContainer}>
               <Feather name="package" size={48} color={colors.border} />
-              <Text style={{ color: colors.textSecondary, marginTop: 12 }}>
-                Pantry Empty
+              <Text
+                style={{
+                  color: colors.textSecondary,
+                  marginTop: 12,
+                  fontWeight: '600',
+                }}
+              >
+                No items found
               </Text>
             </View>
           }
         />
       )}
 
-      {/* 4. FAB Options */}
+      {/* MODULE 9: FLOATING ACTION ORCHESTRATOR (FAB) */}
       <View style={styles.fabContainer}>
         <TouchableOpacity
           style={[
             styles.fab,
-            { backgroundColor: colors.surface, marginBottom: 12 },
+            { backgroundColor: colors.surface, marginBottom: 16 },
           ]}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-            setIsScannerVisible(true);
-          }}
+          onPress={() => setIsScannerVisible(true)}
         >
           <MaterialCommunityIcons
             name="camera-iris"
@@ -343,11 +342,9 @@ export default function PantryScreen() {
             color={colors.primary}
           />
         </TouchableOpacity>
-
         <TouchableOpacity
           style={[styles.fab, { backgroundColor: colors.primary }]}
           onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             setScannedItemData(null);
             setIsAddModalVisible(true);
           }}
@@ -356,17 +353,19 @@ export default function PantryScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* 5. Modals */}
       <AddItemModal
         isVisible={isAddModalVisible}
         onClose={() => setIsAddModalVisible(false)}
         initialData={scannedItemData}
       />
-
       <AIFoodScanner
         isVisible={isScannerVisible}
         onClose={() => setIsScannerVisible(false)}
-        onItemsDetected={handleItemsDetected}
+        onItemsDetected={(d) => {
+          setScannedItemData(d[0]);
+          setIsScannerVisible(false);
+          setIsAddModalVisible(true);
+        }}
       />
     </SafeAreaView>
   );
@@ -376,45 +375,54 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     padding: 24,
-    borderBottomLeftRadius: 36,
-    borderBottomRightRadius: 36,
-    paddingBottom: 40,
+    borderBottomLeftRadius: 32,
+    borderBottomRightRadius: 32,
+    paddingBottom: 32,
   },
-  headerRow: {
+  headerTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
+    marginBottom: 20,
   },
-  headerTitle: { fontSize: 32, fontWeight: '900', color: '#FFF' },
-  badge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
-  badgeText: { color: '#FFF', fontWeight: 'bold', fontSize: 12 },
-  searchContainer: {
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: '900',
+    color: '#FFF',
+    letterSpacing: -0.5,
+  },
+  badge: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  badgeText: { color: '#FFF', fontWeight: '800', fontSize: 12 },
+  searchBar: {
     flexDirection: 'row',
     backgroundColor: '#FFF',
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    height: 54,
+    height: 52,
     alignItems: 'center',
   },
-  searchIcon: { marginRight: 10 },
-  searchInput: { flex: 1, fontSize: 16, color: '#0F172A', fontWeight: '500' },
-  filterWrapper: { marginVertical: 8 },
-  filterList: { paddingHorizontal: 20, paddingVertical: 10 },
+  searchInput: { flex: 1, marginLeft: 10, fontSize: 16, fontWeight: '600' },
+  filterContainer: { marginVertical: 12 },
+  filterContent: { paddingHorizontal: 20 },
   chip: {
     paddingHorizontal: 20,
     paddingVertical: 10,
-    borderRadius: 15,
-    marginRight: 10,
+    borderRadius: 14,
+    marginRight: 8,
     borderWidth: 1,
   },
-  chipText: { fontSize: 13, fontWeight: '700' },
-  listContainer: { padding: SPACING, paddingBottom: 150 },
+  chipText: { fontWeight: '700', fontSize: 13 },
+  listPadding: { padding: SPACING, paddingBottom: 160 },
   columnWrapper: { justifyContent: 'space-between' },
   card: {
     width: COLUMN_WIDTH,
     padding: 16,
-    borderRadius: 28,
+    borderRadius: 24,
     borderWidth: 1,
     marginBottom: 16,
   },
@@ -423,27 +431,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  itemName: { fontSize: 16, fontWeight: '700', flex: 1, marginRight: 4 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
-  meta: { fontSize: 13, fontWeight: '500', marginTop: 4 },
-  expiryLabel: {
+  itemName: { fontSize: 16, fontWeight: '800', flex: 1, marginRight: 8 },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  itemMeta: { fontSize: 12, fontWeight: '600', marginTop: 4 },
+  urgencyText: {
     fontSize: 10,
     fontWeight: '900',
-    textTransform: 'uppercase',
     marginTop: 12,
+    letterSpacing: 1,
   },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  empty: { alignItems: 'center', marginTop: 80 },
-  fabContainer: {
-    position: 'absolute',
-    bottom: 40,
-    right: 24,
-    alignItems: 'center',
-  },
+  fabContainer: { position: 'absolute', bottom: 100, right: 24 },
   fab: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
     elevation: 8,
@@ -452,4 +453,6 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
   },
+  loaderContainer: { marginTop: 100, alignItems: 'center' },
+  emptyContainer: { alignItems: 'center', marginTop: 100 },
 });
