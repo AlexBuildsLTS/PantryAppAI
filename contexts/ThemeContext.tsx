@@ -1,44 +1,26 @@
 /**
  * @file ThemeContext.tsx
- * @description Master AAA+ Tier Theme Engine.
+ * @description Master AAA+ Tier Theme Logic Engine.
  * * ARCHITECTURAL MODULES:
- * 1. DYNAMIC PALETTE ENGINE: Swaps hex-codes based on 'dark' | 'light' state.
- * 2. SYSTEM OVERRIDE: Detects hardware appearance preferences but allows manual toggle.
- * 3. TYPE-SAFE COLOR TOKENS: Ensures 100% parity with the global styling system.
+ * 1. ATOMIC STATE MANAGEMENT: Tracks 'dark' | 'light' modes with hardware parity.
+ * 2. DEPTH ORCHESTRATION: Injects the 'shadows' engine into the global context.
+ * 3. PERFORMANCE HYDRATION: Memoizes theme values to ensure 60FPS palette swaps.
+ * 4. TYPE-SAFE CONSUMPTION: Provides strict TypeScript interfaces for color/shadow tokens.
  */
 
 import React, { createContext, useContext, useState, useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 
-// MODULE 1: DEFINE PALETTES
-// High-fidelitySlate palettes designed for Pantry Pal AI
-const palettes = {
-  dark: {
-    primary: '#22C55E',
-    background: '#0F172A',
-    surface: '#1E293B',
-    success: '#22C55E',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    text: '#FFFFFF',
-    textSecondary: '#94A3B8',
-    border: 'rgba(255, 255, 255, 0.1)',
-  },
-  light: {
-    primary: '#16A34A',
-    background: '#F8FAFC',
-    surface: '#FFFFFF',
-    success: '#16A34A',
-    warning: '#D97706',
-    error: '#DC2626',
-    text: '#0F172A',
-    textSecondary: '#64748B',
-    border: 'rgba(0, 0, 0, 0.1)',
-  },
-};
+// External Design Tokens
+import { palettes, shadows } from '../styles/theme';
 
+/**
+ * MODULE 1: TYPE DEFINITIONS
+ * Description: Ensures 100% parity between theme tokens and UI implementation.
+ */
 interface ThemeContextType {
   colors: typeof palettes.dark;
+  shadows: typeof shadows;
   mode: 'dark' | 'light';
   isDark: boolean;
   toggleTheme: () => void;
@@ -50,26 +32,33 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
   const systemScheme = useColorScheme();
+
+  /**
+   * MODULE 2: ATOMIC STATE INITIALIZATION
+   * Description: Synchronizes initial state with native OS appearance settings.
+   */
   const [mode, setMode] = useState<'dark' | 'light'>(
     systemScheme === 'light' ? 'light' : 'dark'
   );
 
   /**
-   * MODULE 2: TOGGLE LOGIC
-   * Description: Atomic state swap for the theme mode.
+   * MODULE 3: THEME TRANSITION ENGINE
+   * Description: Atomic swap for the appearance mode.
+   * Planned: Can be linked to Haptics in Step 3 (Settings UI).
    */
   const toggleTheme = () => {
     setMode((prev) => (prev === 'dark' ? 'light' : 'dark'));
   };
 
   /**
-   * MODULE 3: PERFORMANCE CACHE (useMemo)
-   * Description: Prevents heavy UI re-paints by only updating the
-   * color object when the mode changes.
+   * MODULE 4: CONTEXT VALUE OPTIMIZATION (useMemo)
+   * Description: Maps exported tokens from 'theme.ts' to the active state.
+   * Implementation: Prevents unecessary re-renders in the Global Provider tree.
    */
   const value = useMemo(
     () => ({
       colors: mode === 'dark' ? palettes.dark : palettes.light,
+      shadows, // Injects shadow engine for layered depth
       mode,
       isDark: mode === 'dark',
       toggleTheme,
@@ -82,8 +71,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
+/**
+ * MODULE 5: CUSTOM HOOK INTERFACE
+ */
 export const useTheme = () => {
   const context = useContext(ThemeContext);
-  if (!context) throw new Error('useTheme must be used within ThemeProvider');
+  if (!context) {
+    throw new Error(
+      'AAA+ Exception: useTheme must be used within ThemeProvider'
+    );
+  }
   return context;
 };

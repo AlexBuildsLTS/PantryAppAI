@@ -2,15 +2,15 @@
  * @file settings.tsx
  * @description Master AAA+ Tier Command Center & Identity Hub.
  * * ARCHITECTURAL MODULES:
- * 1. IDENTITY ORCHESTRATION: Dynamically renders 'profiles' metadata with 'avatars' bucket integration.
- * 2. HOUSEHOLD QR ENGINE: Generates secure, real-time sharing tokens for household sync.
- * 3. HARDWARE SECURITY BRIDGE: Binds UI toggles to 'BiometricService' with haptic confirmation.
- * 4. THEME SYNCHRONIZATION: Executes instant palette swapping via 'ThemeContext'.
- * 5. SESSION TERMINATION: Implements high-alert sign-out protocol with barrier guards.
+ * 1. IDENTITY ORCHESTRATION: Maps user profile metadata with high-fidelity fallback logic.
+ * 2. HOUSEHOLD SYNC ENGINE: Generates real-time QR tokens for synchronized supply tracking.
+ * 3. HARDWARE SECURITY BRIDGE: Binds system switches to native Biometric hardware.
+ * 4. DYNAMIC THEME ENGINE: Synchronizes layered depth and shadow tokens across mode swaps.
+ * 5. SESSION TERMINATION: Implements the 'Hard Guard' logout protocol with warning feedback.
  */
 
 /* cspell:disable-next-line */
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+import Animated, {
+  FadeInUp,
+  FadeInDown,
+  Layout,
+} from 'react-native-reanimated';
 import QRCode from 'react-native-qrcode-svg';
 
 // Internal System Contexts & Services
@@ -34,16 +38,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import { BiometricService } from '../../services/BiometricService';
 
 export default function SettingsScreen() {
-  const { colors, isDark, toggleTheme } = useTheme();
+  const { colors, shadows, isDark, toggleTheme } = useTheme();
   const { profile, user, household, signOut } = useAuth();
 
-  // Local UX State for hardware persistence
+  // Local hardware-link state
   const [bioEnabled, setBioEnabled] = useState(true);
   const [showQR, setShowQR] = useState(false);
 
   /**
    * MODULE 1: SECURITY HANDOVER
-   * Description: Challenges user via hardware before committing a preference change.
+   * Description: Executes a hardware-backed challenge via 'BiometricService'.
    */
   const handleBiometricToggle = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -55,8 +59,8 @@ export default function SettingsScreen() {
   };
 
   /**
-   * MODULE 2: SIGN OUT PROTOCOL
-   * Description: Triggers alert and wipes secure session memory.
+   * MODULE 2: SESSION TERMINATION
+   * Description: Ends the secure session with Haptic warning feedback.
    */
   const handleSignOut = () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -70,6 +74,19 @@ export default function SettingsScreen() {
     );
   };
 
+  /**
+   * MODULE 3: DYNAMIC BENTO STYLING
+   * Description: Combines Context colors with the Layered Depth Shadow Engine.
+   */
+  const cardStyle = useMemo(
+    () => [
+      styles.bentoGroup,
+      { backgroundColor: colors.surface, borderColor: colors.border },
+      !isDark && shadows.medium,
+    ],
+    [colors, isDark, shadows]
+  );
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
@@ -79,7 +96,7 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
       >
-        {/* MODULE 3: ELITE IDENTITY CARD 
+        {/* MODULE 4: ELITE IDENTITY ARCHITECTURE 
             Description: Maps user profile and avatar data with dynamic fallbacks.
         */}
         <Animated.View
@@ -87,6 +104,7 @@ export default function SettingsScreen() {
           style={[
             styles.profileCard,
             { backgroundColor: colors.surface, borderColor: colors.border },
+            !isDark && shadows.medium,
           ]}
         >
           <View style={styles.avatarContainer}>
@@ -128,18 +146,13 @@ export default function SettingsScreen() {
           </View>
         </Animated.View>
 
-        {/* MODULE 4: HOUSEHOLD ORCHESTRATION 
-            Description: Household management and QR sharing module.
+        {/* MODULE 5: HOUSEHOLD ORCHESTRATION 
+            Description: Generates sharing tokens for real-time inventory synchronization.
         */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
           HOUSEHOLD SYNC
         </Text>
-        <View
-          style={[
-            styles.bentoGroup,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
+        <View style={cardStyle}>
           <TouchableOpacity
             style={styles.householdHeader}
             onPress={() => {
@@ -174,8 +187,18 @@ export default function SettingsScreen() {
           </TouchableOpacity>
 
           {showQR && (
-            <Animated.View entering={FadeInUp} style={styles.qrContainer}>
-              <View style={[styles.qrWrapper, { borderColor: colors.border }]}>
+            <Animated.View
+              entering={FadeInUp}
+              layout={Layout.springify()}
+              style={styles.qrContainer}
+            >
+              <View
+                style={[
+                  styles.qrWrapper,
+                  { borderColor: colors.border },
+                  !isDark && shadows.small,
+                ]}
+              >
                 <QRCode
                   value={`pantrypal://join/${household?.id}`}
                   size={160}
@@ -184,27 +207,29 @@ export default function SettingsScreen() {
                 />
               </View>
               <Text style={[styles.qrHint, { color: colors.textSecondary }]}>
-                Allow a member to scan this to sync instantly.
+                Synchronize family inventory across all devices.
               </Text>
             </Animated.View>
           )}
         </View>
 
-        {/* MODULE 5: SYSTEM PREFERENCES 
-            Description: Real-time toggles for Appearance and Security hardware.
+        {/* MODULE 6: SYSTEM CONFIGURATION PREFERENCES 
+            Description: Real-time appearance and hardware security orchestration.
         */}
         <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
           SYSTEM PREFERENCES
         </Text>
-        <View
-          style={[
-            styles.bentoGroup,
-            { backgroundColor: colors.surface, borderColor: colors.border },
-          ]}
-        >
+        <View style={cardStyle}>
           <View style={styles.settingRow}>
             <View style={styles.rowLeft}>
-              <Feather name="moon" size={20} color={colors.primary} />
+              <View
+                style={[
+                  styles.iconBox,
+                  { backgroundColor: colors.primary + '15' },
+                ]}
+              >
+                <Feather name="moon" size={18} color={colors.primary} />
+              </View>
               <Text style={[styles.rowLabel, { color: colors.text }]}>
                 Dark Appearance
               </Text>
@@ -215,13 +240,15 @@ export default function SettingsScreen() {
                 Haptics.selectionAsync();
                 toggleTheme();
               }}
-              trackColor={{ true: colors.primary }}
+              trackColor={{ true: colors.primary, false: colors.border }}
             />
           </View>
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.settingRow}>
             <View style={styles.rowLeft}>
-              <Feather name="shield" size={20} color="#10B981" />
+              <View style={[styles.iconBox, { backgroundColor: '#10B98115' }]}>
+                <Feather name="shield" size={18} color="#10B981" />
+              </View>
               <Text style={[styles.rowLabel, { color: colors.text }]}>
                 Biometric Security
               </Text>
@@ -232,22 +259,19 @@ export default function SettingsScreen() {
               trackColor={{ true: '#10B981' }}
             />
           </View>
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-          <View style={styles.settingRow}>
-            <View style={styles.rowLeft}>
-              <Feather name="bell" size={20} color="#F59E0B" />
-              <Text style={[styles.rowLabel, { color: colors.text }]}>
-                Push Intelligence
-              </Text>
-            </View>
-            <Switch value={true} trackColor={{ true: '#F59E0B' }} />
-          </View>
         </View>
 
-        {/* MODULE 6: DANGER ZONE */}
+        {/* MODULE 7: DANGER ZONE ORCHESTRATION */}
         <TouchableOpacity
           onPress={handleSignOut}
-          style={[styles.logoutBtn, { borderColor: colors.error + '40' }]}
+          style={[
+            styles.logoutBtn,
+            {
+              borderColor: colors.error + '40',
+              backgroundColor: colors.surface,
+            },
+            !isDark && shadows.small,
+          ]}
         >
           <Feather name="power" size={18} color={colors.error} />
           <Text style={[styles.logoutText, { color: colors.error }]}>
@@ -256,7 +280,7 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         <Text style={[styles.footerText, { color: colors.textSecondary }]}>
-          Pantry Pal Enterprise • Build 2026.1.8{'\n'}Encrypted End-to-End
+          Pantry Pal Enterprise • Build 2026.1.9{'\n'}Hardware-Backed Encryption
         </Text>
         <View style={{ height: 120 }} />
       </ScrollView>
@@ -269,7 +293,7 @@ const styles = StyleSheet.create({
   scroll: { padding: 24 },
   profileCard: {
     padding: 24,
-    borderRadius: 36,
+    borderRadius: 32,
     borderWidth: 1,
     flexDirection: 'row',
     alignItems: 'center',
@@ -311,13 +335,13 @@ const styles = StyleSheet.create({
     borderRadius: 32,
     borderWidth: 1,
     overflow: 'hidden',
-    marginBottom: 32,
+    marginBottom: 24,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
+    padding: 18,
   },
   householdHeader: {
     flexDirection: 'row',
@@ -329,16 +353,16 @@ const styles = StyleSheet.create({
   rowLabel: { fontSize: 16, fontWeight: '700' },
   rowSubLabel: { fontSize: 12, fontWeight: '500', opacity: 0.5, marginTop: 2 },
   iconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 40,
+    height: 40,
+    borderRadius: 12,
     justifyContent: 'center',
     alignItems: 'center',
   },
   divider: { height: 1, marginHorizontal: 20 },
   qrContainer: { alignItems: 'center', padding: 32, paddingTop: 0 },
   qrWrapper: {
-    padding: 24,
+    padding: 20,
     backgroundColor: 'white',
     borderRadius: 28,
     borderWidth: 1,
@@ -349,6 +373,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingHorizontal: 20,
     lineHeight: 18,
+    fontWeight: '600',
   },
   logoutBtn: {
     height: 64,
@@ -356,8 +381,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: 12,
+    justifyContent: 'center',
   },
   logoutText: { fontSize: 16, fontWeight: '800' },
   footerText: {
