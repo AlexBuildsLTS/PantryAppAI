@@ -1,7 +1,6 @@
 /**
  * @file sign-up.tsx
- * @description Enterprise-grade registration screen for Pantry Pal.
- * Features glassmorphic UI, validation, and automatic profile trigger integration.
+ * @description AAA+ Tier Registration with Metadata Sync.
  */
 
 import React, { useState } from 'react';
@@ -16,62 +15,46 @@ import {
   Alert,
   ScrollView,
 } from 'react-native';
-import { Link, useRouter } from 'expo-router';
-import { supabase } from '../../services/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function SignUp() {
   const router = useRouter();
+  const { signUp } = useAuth();
+  const { colors, shadows, isDark } = useTheme();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  /**
-   * Handles user registration.
-   * Passing 'full_name' in the metadata allows the Supabase trigger
-   * to automatically populate the public.profiles table.
-   */
-  async function signUpWithEmail() {
+  const handleSignUp = async () => {
     if (!email || !password || !fullName) {
-      Alert.alert(
-        'Missing Info',
-        'Please fill in all fields to create your pantry.'
-      );
+      Alert.alert('Missing Info', 'Please fill in all fields.');
       return;
     }
 
     setLoading(true);
-    const { error, data } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          username: email.split('@')[0], // Default username from email
-        },
-      },
-    });
+    const { error } = await signUp(email, password, fullName);
 
     if (error) {
-      Alert.alert('Registration Failed', error.message);
+      Alert.alert('Registration Error', error.message);
       setLoading(false);
-    } else if (data.session) {
-      // User is signed in immediately
-      router.replace('/(tabs)');
     } else {
-      Alert.alert(
-        'Check your email',
-        'We sent you a verification link to complete your setup.'
-      );
+      Alert.alert('Success', 'Check your email for the verification link.');
       router.replace('/(auth)/sign-in');
     }
-  }
+  };
 
   return (
-    <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.container}>
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        keyboardShouldPersistTaps="handled"
+      >
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.inner}
@@ -80,139 +63,130 @@ export default function SignUp() {
             style={styles.backButton}
             onPress={() => router.back()}
           >
-            <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            <Ionicons name="chevron-back" size={28} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Start tracking, stop wasting.</Text>
+            <Text style={[styles.title, { color: colors.text }]}>
+              Join Pantry Pal
+            </Text>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Start your organized culinary journey.
+            </Text>
           </View>
 
-          <View style={styles.form}>
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color="#94A3B8"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                placeholder="Full Name"
-                placeholderTextColor="#94A3B8"
-                style={styles.input}
-                onChangeText={setFullName}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color="#94A3B8"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                placeholder="Email Address"
-                placeholderTextColor="#94A3B8"
-                style={styles.input}
-                onChangeText={setEmail}
-                autoCapitalize="none"
-                keyboardType="email-address"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Ionicons
-                name="lock-closed-outline"
-                size={20}
-                color="#94A3B8"
-                style={styles.inputIcon}
-              />
-              <TextInput
-                placeholder="Password"
-                placeholderTextColor="#94A3B8"
-                style={styles.input}
-                secureTextEntry
-                onChangeText={setPassword}
-              />
-            </View>
+          <BlurView
+            intensity={isDark ? 40 : 80}
+            tint={isDark ? 'dark' : 'light'}
+            style={[styles.glassCard, { borderColor: colors.border }]}
+          >
+            {[
+              {
+                label: 'FULL NAME',
+                icon: 'person-outline',
+                placeholder: 'John Doe',
+                value: fullName,
+                setter: setFullName,
+              },
+              {
+                label: 'EMAIL',
+                icon: 'mail-outline',
+                placeholder: 'chef@pantry.ai',
+                value: email,
+                setter: setEmail,
+                type: 'email-address',
+              },
+              {
+                label: 'PASSWORD',
+                icon: 'lock-closed-outline',
+                placeholder: '••••••••',
+                value: password,
+                setter: setPassword,
+                secure: true,
+              },
+            ].map((field, idx) => (
+              <View key={idx} style={styles.inputGroup}>
+                <Text style={[styles.label, { color: colors.textSecondary }]}>
+                  {field.label}
+                </Text>
+                <View
+                  style={[
+                    styles.inputWrapper,
+                    {
+                      backgroundColor: colors.background,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name={field.icon as any}
+                    size={20}
+                    color={colors.textSecondary}
+                  />
+                  <TextInput
+                    placeholder={field.placeholder}
+                    placeholderTextColor={colors.textSecondary}
+                    style={[styles.input, { color: colors.text }]}
+                    value={field.value}
+                    onChangeText={field.setter}
+                    secureTextEntry={field.secure}
+                    keyboardType={field.type as any}
+                    autoCapitalize="none"
+                  />
+                </View>
+              </View>
+            ))}
 
             <TouchableOpacity
-              style={[styles.button, loading && { opacity: 0.7 }]}
-              onPress={signUpWithEmail}
+              style={[
+                styles.primaryButton,
+                { backgroundColor: colors.primary },
+                shadows.medium,
+              ]}
+              onPress={handleSignUp}
               disabled={loading}
             >
               <Text style={styles.buttonText}>
-                {loading ? 'Creating Account...' : 'Get Started'}
+                {loading ? 'Generating Vault...' : 'Create Account'}
               </Text>
             </TouchableOpacity>
-
-            <View style={styles.footer}>
-              <Text style={styles.footerText}>Already have an account? </Text>
-              <Link href="/(auth)/sign-in" asChild>
-                <TouchableOpacity>
-                  <Text style={styles.linkText}>Sign In</Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
-          </View>
+          </BlurView>
         </KeyboardAvoidingView>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { flex: 1, padding: 24, justifyContent: 'center' },
-  backButton: {
-    position: 'absolute',
-    top: 60,
-    left: 24,
-    zIndex: 10,
+  backButton: { position: 'absolute', top: 60, left: 20, zIndex: 10 },
+  header: { marginBottom: 32, marginTop: 40 },
+  title: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
+  subtitle: { fontSize: 16, marginTop: 6 },
+  glassCard: {
+    padding: 24,
+    borderRadius: 32,
+    borderWidth: 1,
+    overflow: 'hidden',
   },
-  header: { marginBottom: 40, marginTop: 40 },
-  title: {
-    fontSize: 36,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -1,
-  },
-  subtitle: { fontSize: 18, color: '#94A3B8', marginTop: 8 },
-  form: { gap: 16 },
-  inputContainer: {
+  inputGroup: { marginBottom: 18 },
+  label: { fontSize: 11, fontWeight: '800', marginBottom: 6, letterSpacing: 1 },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    height: 56,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
     paddingHorizontal: 16,
   },
-  inputIcon: { marginRight: 12 },
-  input: {
-    flex: 1,
-    paddingVertical: 18,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#6366F1',
+  input: { flex: 1, marginLeft: 12, fontSize: 16 },
+  primaryButton: {
+    height: 58,
     borderRadius: 16,
-    padding: 18,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 12,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    marginTop: 10,
   },
   buttonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  footer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 24,
-  },
-  footerText: { color: '#94A3B8', fontSize: 15 },
-  linkText: { color: '#6366F1', fontWeight: 'bold', fontSize: 15 },
 });

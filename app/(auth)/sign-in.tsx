@@ -1,6 +1,6 @@
 /**
  * @file sign-in.tsx
- * @description Production-ready Sign-In screen with fixed ESLint entities.
+ * @description AAA+ Tier Glassmorphic Sign-In.
  */
 
 import React, { useState } from 'react';
@@ -13,121 +13,193 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { Link } from 'expo-router';
-import { supabase } from '../../services/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Link, useRouter } from 'expo-router';
+import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
+import { BlurView } from 'expo-blur';
+import { Ionicons } from '@expo/vector-icons';
 
 export default function SignIn() {
+  const router = useRouter();
+  const { signIn } = useAuth();
+  const { colors, shadows, isDark } = useTheme();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
-  async function signInWithEmail() {
+  const handleSignIn = async () => {
     if (!email || !password) {
-      Alert.alert('Required', 'Please enter both email and password.');
+      Alert.alert('Required', 'Please enter your credentials.');
       return;
     }
 
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
+    const { error } = await signIn(email, password);
     if (error) {
-      Alert.alert('Authentication Error', error.message);
+      Alert.alert('Auth Error', error.message);
+    } else {
+      router.replace('/(tabs)');
     }
     setLoading(false);
-  }
+  };
 
   return (
-    <LinearGradient colors={['#0F172A', '#1E293B']} style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.inner}
       >
-        <View style={styles.header}>
-          <Text style={styles.title}>Pantry Pal</Text>
-          <Text style={styles.subtitle}>Welcome back, Chef.</Text>
+        <View style={styles.branding}>
+          <View
+            style={[
+              styles.logoCircle,
+              { backgroundColor: colors.primary },
+              shadows.medium,
+            ]}
+          >
+            <Ionicons name="fast-food" size={40} color="white" />
+          </View>
+          <Text style={[styles.title, { color: colors.text }]}>Pantry Pal</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+            Enterprise Inventory Management
+          </Text>
         </View>
 
-        <View style={styles.form}>
-          <TextInput
-            placeholder="Email"
-            placeholderTextColor="#94A3B8"
-            style={styles.input}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-          />
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#94A3B8"
-            style={styles.input}
-            secureTextEntry
-            onChangeText={setPassword}
-          />
+        <BlurView
+          intensity={isDark ? 40 : 80}
+          tint={isDark ? 'dark' : 'light'}
+          style={[styles.glassCard, { borderColor: colors.border }]}
+        >
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              EMAIL
+            </Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="mail-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                placeholder="chef@pantrypal.ai"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.input, { color: colors.text }]}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.textSecondary }]}>
+              PASSWORD
+            </Text>
+            <View
+              style={[
+                styles.inputWrapper,
+                {
+                  backgroundColor: colors.background,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <Ionicons
+                name="lock-closed-outline"
+                size={20}
+                color={colors.textSecondary}
+              />
+              <TextInput
+                placeholder="••••••••"
+                placeholderTextColor={colors.textSecondary}
+                style={[styles.input, { color: colors.text }]}
+                secureTextEntry
+                onChangeText={setPassword}
+              />
+            </View>
+          </View>
 
           <TouchableOpacity
-            style={[styles.button, loading && { opacity: 0.7 }]}
-            onPress={signInWithEmail}
+            style={[
+              styles.primaryButton,
+              { backgroundColor: colors.primary },
+              shadows.medium,
+              loading && { opacity: 0.8 },
+            ]}
+            onPress={handleSignIn}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Authenticating...' : 'Sign In'}
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.buttonText}>Sign In</Text>
+            )}
+          </TouchableOpacity>
+        </BlurView>
+
+        <Link href="/(auth)/sign-up" asChild>
+          <TouchableOpacity style={styles.footerLink}>
+            <Text style={{ color: colors.textSecondary }}>
+              New here?{' '}
+              <Text style={{ color: colors.primary, fontWeight: '700' }}>
+                Create an Account
+              </Text>
             </Text>
           </TouchableOpacity>
-
-          <Link href="/(auth)/sign-up" asChild>
-            <TouchableOpacity style={styles.link}>
-              {/* FIXED: Escaped the apostrophe using standard JSX practices */}
-              <Text style={styles.linkText}>
-                Don{"'"}t have an account?{' '}
-                <Text style={styles.linkHighlight}>Sign Up</Text>
-              </Text>
-            </TouchableOpacity>
-          </Link>
-        </View>
+        </Link>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
   inner: { flex: 1, justifyContent: 'center', padding: 24 },
-  header: { marginBottom: 48, alignItems: 'center' },
-  title: {
-    fontSize: 42,
-    fontWeight: '900',
-    color: '#FFFFFF',
-    letterSpacing: -1,
-  },
-  subtitle: { fontSize: 18, color: '#94A3B8', marginTop: 8 },
-  form: { gap: 16 },
-  input: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 16,
-    padding: 18,
-    color: '#FFFFFF',
-    fontSize: 16,
-  },
-  button: {
-    backgroundColor: '#6366F1',
-    borderRadius: 16,
-    padding: 18,
+  branding: { alignItems: 'center', marginBottom: 40 },
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 24,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 8,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
+    marginBottom: 16,
+  },
+  title: { fontSize: 36, fontWeight: '900', letterSpacing: -1 },
+  subtitle: { fontSize: 16, marginTop: 4 },
+  glassCard: {
+    padding: 24,
+    borderRadius: 32,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  inputGroup: { marginBottom: 20 },
+  label: { fontSize: 12, fontWeight: '800', marginBottom: 8, letterSpacing: 1 },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 60,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+  },
+  input: { flex: 1, marginLeft: 12, fontSize: 16 },
+  primaryButton: {
+    height: 60,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
   },
   buttonText: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
-  link: { marginTop: 16, alignItems: 'center' },
-  linkText: { color: '#94A3B8', fontSize: 14 },
-  linkHighlight: { color: '#6366F1', fontWeight: 'bold' },
+  footerLink: { marginTop: 32, alignItems: 'center' },
 });

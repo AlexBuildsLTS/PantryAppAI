@@ -1,10 +1,7 @@
 /**
  * @file theme.ts
  * @description Master AAA+ Tier Design System.
- * * ARCHITECTURAL MODULES:
- * 1. LAYERED DEPTH PALETTES: Utilizes Slate-50 foundations for elevated light-mode pop.
- * 2. PREMIUM COLOR TOKENS: Professional indigo-slate hybrids for high-contrast legibility.
- * 3. SOFT-DEPTH SHADOW ENGINE: Uses indigo-tinted opacity for expensive-feeling UI depth.
+ * Updated: High-fidelity Glassmorphism & Gradient Engine for Light Mode.
  */
 
 export interface ThemeColors {
@@ -19,9 +16,13 @@ export interface ThemeColors {
   textSecondary: string;
   border: string;
   shadow: string;
+  glass: {
+    background: string;
+    intensity: number;
+    borderColor: string;
+  };
 }
 
-// MODULE 1: EXPORTED PALETTES
 export const palettes = {
   dark: {
     primary: '#22C55E',
@@ -35,6 +36,12 @@ export const palettes = {
     textSecondary: '#94A3B8',
     border: 'rgba(255, 255, 255, 0.08)',
     shadow: '#000000',
+    // AAA+ Glassmorphism
+    glass: {
+      background: 'rgba(30, 41, 59, 0.7)',
+      intensity: 80,
+      borderColor: 'rgba(255, 255, 255, 0.1)',
+    },
   },
   light: {
     primary: '#16A34A',
@@ -48,11 +55,21 @@ export const palettes = {
     textSecondary: '#64748B', // Muted Meta (Slate-500)
     border: 'rgba(15, 23, 42, 0.06)', // Ultra-subtle border
     shadow: '#312E81', // Indigo-tinted shadow for professional depth
+    // AAA+ Glassmorphism (High Intensity for Light Mode)
+    glass: {
+      background: 'rgba(255, 255, 255, 0.85)',
+      intensity: 95,
+      borderColor: 'rgba(255, 255, 255, 0.5)',
+    },
   },
 };
 
-// MODULE 2: EXPORTED SHADOW ENGINE
-// Designed to create the "Floating Bento" effect in light mode.
+export const gradients = {
+  primary: ['#16A34A', '#22C55E'],
+  accent: ['#6366F1', '#8B5CF6'], // Indigo-Violet hybrid
+  glass: ['rgba(255,255,255,0.4)', 'rgba(255,255,255,0.1)'],
+};
+
 export const shadows = {
   small: {
     shadowColor: palettes.light.shadow,
@@ -64,14 +81,14 @@ export const shadows = {
   medium: {
     shadowColor: palettes.light.shadow,
     shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.06,
+    shadowOpacity: 0.08, // Increased for better Light Mode depth
     shadowRadius: 24,
     elevation: 8,
   },
   large: {
     shadowColor: palettes.light.shadow,
     shadowOffset: { width: 0, height: 20 },
-    shadowOpacity: 0.08,
+    shadowOpacity: 0.12,
     shadowRadius: 40,
     elevation: 12,
   },

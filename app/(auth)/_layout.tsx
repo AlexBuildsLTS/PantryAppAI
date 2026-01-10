@@ -1,27 +1,29 @@
 /**
  * @file app/(auth)/_layout.tsx
- * @description Layout for the authentication stack.
- * Ensures unauthenticated users see the Sign In/Up screens without tabs.
+ * @description Master Auth Layout with Theme Synchronization.
  */
 
 import React from 'react';
 import { Stack } from 'expo-router';
+import { useTheme } from '../../contexts/ThemeContext';
+import { StatusBar } from 'expo-status-bar';
 
-/**
- * We use a simple Stack here to manage transition between Sign In and Sign Up.
- * The redirect logic is handled by the Root Layout in app/_layout.tsx.
- */
 export default function AuthLayout() {
+  const { colors, isDark } = useTheme();
+
   return (
-    <Stack
-      screenOptions={{
-        headerShown: false,
-        animation: 'slide_from_right',
-        contentStyle: { backgroundColor: '#0F172A' },
-      }}
-    >
-      <Stack.Screen name="sign-in" />
-      <Stack.Screen name="sign-up" />
-    </Stack>
+    <>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+      <Stack
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade_from_bottom',
+          contentStyle: { backgroundColor: colors.background },
+        }}
+      >
+        <Stack.Screen name="sign-in" />
+        <Stack.Screen name="sign-up" />
+      </Stack>
+    </>
   );
 }

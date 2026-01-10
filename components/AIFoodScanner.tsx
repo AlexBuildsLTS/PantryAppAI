@@ -1,10 +1,10 @@
 /**
  * @file AIFoodScanner.tsx
- * @description high-performance AI vision interface.
- * Fixed: Explicit AIScanResult typing and memory management.
+ * @description Enterprise-grade AI Vision Interface.
+ * Features: Glassmorphic controls, Scanning Laser Animation, and Haptic Feedback.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,15 +13,29 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  Platform,
+  SafeAreaView,
 } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  withSequence,
+} from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Internal Systems
 import { GeminiAIService, AIScanResult } from '../services/GeminiAIService';
 import { useTheme } from '../contexts/ThemeContext';
+
+const { width, height } = Dimensions.get('window');
 
 interface AIFoodScannerProps {
   isVisible: boolean;
@@ -34,15 +48,32 @@ export default function AIFoodScanner({
   onClose,
   onItemsDetected,
 }: AIFoodScannerProps) {
-  const { colors } = useTheme();
+  const { colors, shadows, isDark } = useTheme();
   const [permission, requestPermission] = useCameraPermissions();
   const [isProcessing, setIsProcessing] = useState(false);
   const cameraRef = useRef<any>(null);
 
-  if (!isVisible) return null;
+  // --- ANIMATION LOGIC ---
+  const laserPos = useSharedValue(0);
 
-  if (!permission) return <View />;
-  if (!permission.granted) {
+  useEffect(() => {
+    if (isVisible) {
+      laserPos.value = withRepeat(
+        withSequence(
+          withTiming(1, { duration: 2000 }),
+          withTiming(0, { duration: 2000 })
+        ),
+        -1
+      );
+    }
+  }, [isVisible]);
+
+  const laserStyle = useAnimatedStyle(() => ({
+    top: `${laserPos.value * 100}%`,
+  }));
+
+  if (!isVisible) return null;
+  if (!permission?.granted) {
     return (
       <View
         style={[
@@ -50,19 +81,34 @@ export default function AIFoodScanner({
           { backgroundColor: colors.background },
         ]}
       >
-        <Feather name="camera-off" size={64} color={colors.textSecondary} />
-        <Text style={[styles.permissionText, { color: colors.text }]}>
-          AI Vision requires camera access to identify items.
-        </Text>
-        <TouchableOpacity
-          style={[styles.btn, { backgroundColor: colors.primary }]}
-          onPress={requestPermission}
+        <BlurView
+          intensity={80}
+          tint={isDark ? 'dark' : 'light'}
+          style={styles.permissionCard}
         >
-          <Text style={styles.btnText}>Enable Camera</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
-          <Text style={{ color: colors.textSecondary }}>Cancel</Text>
-        </TouchableOpacity>
+          <Feather name="camera" size={48} color={colors.primary} />
+          <Text style={[styles.permissionText, { color: colors.text }]}>
+            Enable AI Vision
+          </Text>
+          <Text
+            style={[styles.permissionSubText, { color: colors.textSecondary }]}
+          >
+            Camera access is required for real-time food recognition.
+          </Text>
+          <TouchableOpacity
+            style={[
+              styles.btn,
+              { backgroundColor: colors.primary },
+              shadows.medium,
+            ]}
+            onPress={requestPermission}
+          >
+            <Text style={styles.btnText}>Allow Access</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={onClose} style={styles.cancelLink}>
+            <Text style={{ color: colors.textSecondary }}>Not now</Text>
+          </TouchableOpacity>
+        </BlurView>
       </View>
     );
   }
@@ -72,14 +118,13 @@ export default function AIFoodScanner({
 
     try {
       setIsProcessing(true);
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
       const photo = await cameraRef.current.takePictureAsync({
         base64: true,
-        quality: 0.5,
+        quality: 0.6,
       });
 
-      // Fixed: Casting result to AIScanResult to ensure .success exists
       const result: AIScanResult = await GeminiAIService.scanFoodImage(
         photo.base64
       );
@@ -89,13 +134,14 @@ export default function AIFoodScanner({
           Haptics.NotificationFeedbackType.Success
         );
         onItemsDetected(result.detectedItems);
+        onClose();
       } else {
         throw new Error(result.error || 'No items recognized');
       }
     } catch (error: any) {
       Alert.alert(
-        'Recognition Failed',
-        'Gemini could not identify the items. Check lighting.'
+        'AI Intelligence Alert',
+        'Gemini is having trouble identifying these items. Try improving the lighting.'
       );
     } finally {
       setIsProcessing(false);
@@ -110,48 +156,119 @@ export default function AIFoodScanner({
     >
       <CameraView ref={cameraRef} style={styles.camera} facing="back">
         <View style={styles.overlay}>
-          <View style={styles.header}>
-            <TouchableOpacity onPress={onClose} style={styles.closeCircle}>
-              <Feather name="x" size={24} color="white" />
+          {/* HEADER: Glassmorphic Info Bar */}
+          <SafeAreaView style={styles.header}>
+            <TouchableOpacity onPress={onClose} style={styles.iconCircle}>
+              <BlurView
+                intensity={60}
+                tint="dark"
+                style={StyleSheet.absoluteFill}
+              />
+              <Feather name="chevron-left" size={24} color="white" />
             </TouchableOpacity>
-            <View style={styles.aiLabel}>
-              <Text style={styles.aiLabelText}>GEMINI AI ACTIVE</Text>
-            </View>
-            <View style={{ width: 44 }} />
-          </View>
 
-          <View style={styles.scannerContainer}>
-            <View
-              style={[
-                styles.targetBox,
-                { borderColor: isProcessing ? colors.primary : 'white' },
-              ]}
-            >
+            <BlurView intensity={40} tint="dark" style={styles.aiBadge}>
+              <MaterialCommunityIcons
+                name="auto-fix"
+                size={14}
+                color={colors.primary}
+              />
+              <Text style={styles.aiBadgeText}>GEMINI PRO VISION v1.5</Text>
+            </BlurView>
+
+            <View style={{ width: 44 }} />
+          </SafeAreaView>
+
+          {/* SCANNER VIEWPORT */}
+          <View style={styles.viewportContainer}>
+            <View style={styles.targetFrame}>
+              {/* Corner Accents */}
+              <View
+                style={[
+                  styles.corner,
+                  styles.topLeft,
+                  { borderColor: colors.primary },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.topRight,
+                  { borderColor: colors.primary },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.bottomLeft,
+                  { borderColor: colors.primary },
+                ]}
+              />
+              <View
+                style={[
+                  styles.corner,
+                  styles.bottomRight,
+                  { borderColor: colors.primary },
+                ]}
+              />
+
+              {/* The Laser Animation */}
+              {!isProcessing && (
+                <Animated.View style={[styles.laser, laserStyle]}>
+                  <LinearGradient
+                    colors={['transparent', colors.primary, 'transparent']}
+                    start={{ x: 0, y: 0.5 }}
+                    end={{ x: 1, y: 0.5 }}
+                    style={StyleSheet.absoluteFill}
+                  />
+                </Animated.View>
+              )}
+
               {isProcessing && (
-                <View style={styles.loadingOverlay}>
-                  <ActivityIndicator size="large" color="white" />
-                  <Text style={styles.loadingText}>
-                    Analyzing Ingredients...
+                <BlurView
+                  intensity={90}
+                  tint="dark"
+                  style={styles.processingOverlay}
+                >
+                  <ActivityIndicator size="large" color={colors.primary} />
+                  <Text style={styles.processingText}>
+                    ANALYZING INGREDIENTS...
                   </Text>
-                </View>
+                </BlurView>
               )}
             </View>
           </View>
 
+          {/* FOOTER: Glass Capture Controls */}
           <View style={styles.footer}>
-            <Text style={styles.hint}>Point at food to auto-detect</Text>
-            <TouchableOpacity
-              style={[styles.captureBtn, { borderColor: colors.primary }]}
-              onPress={handleCapture}
-              disabled={isProcessing}
+            <BlurView
+              intensity={isDark ? 80 : 60}
+              tint={isDark ? 'dark' : 'light'}
+              style={styles.capturePanel}
             >
-              <View
-                style={[
-                  styles.captureInner,
-                  { backgroundColor: isProcessing ? 'transparent' : 'white' },
-                ]}
-              />
-            </TouchableOpacity>
+              <Text
+                style={[styles.hint, { color: isDark ? 'white' : colors.text }]}
+              >
+                Center items in the frame for best results
+              </Text>
+
+              <TouchableOpacity
+                style={[styles.captureBtn, { borderColor: colors.primary }]}
+                onPress={handleCapture}
+                disabled={isProcessing}
+              >
+                <LinearGradient
+                  colors={[colors.primary, '#6366F1']}
+                  style={styles.captureInner}
+                >
+                  <MaterialCommunityIcons
+                    name="shimmer"
+                    size={32}
+                    color="white"
+                  />
+                </LinearGradient>
+              </TouchableOpacity>
+            </BlurView>
           </View>
         </View>
       </CameraView>
@@ -160,91 +277,138 @@ export default function AIFoodScanner({
 }
 
 const styles = StyleSheet.create({
-  fullScreen: { ...StyleSheet.absoluteFillObject, zIndex: 1000 },
+  fullScreen: { ...StyleSheet.absoluteFillObject, zIndex: 9999 },
   camera: { flex: 1 },
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'space-between',
-    padding: 24,
-  },
+  overlay: { flex: 1, justifyContent: 'space-between' },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 40,
+    paddingHorizontal: 20,
+    marginTop: Platform.OS === 'ios' ? 0 : 40,
   },
-  closeCircle: {
+  iconCircle: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  aiLabel: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 10,
+  aiBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    overflow: 'hidden',
   },
-  aiLabelText: {
+  aiBadgeText: {
     color: 'white',
     fontSize: 10,
     fontWeight: '900',
-    letterSpacing: 1.5,
+    letterSpacing: 1,
   },
-  scannerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  targetBox: {
-    width: Dimensions.get('window').width * 0.75,
-    height: Dimensions.get('window').width * 0.75,
-    borderWidth: 2,
-    borderRadius: 40,
-    borderStyle: 'dashed',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingOverlay: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 40,
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-  },
-  loadingText: {
-    color: 'white',
-    marginTop: 12,
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  footer: { alignItems: 'center', marginBottom: 40 },
-  hint: {
-    color: 'rgba(255,255,255,0.6)',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 20,
-  },
-  captureBtn: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    padding: 4,
-  },
-  captureInner: { flex: 1, borderRadius: 36 },
-  permissionContainer: {
+  viewportContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  targetFrame: {
+    width: width * 0.75,
+    height: width * 0.75,
+    position: 'relative',
+  },
+  corner: { position: 'absolute', width: 40, height: 40, borderWidth: 4 },
+  topLeft: {
+    top: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 24,
+  },
+  topRight: {
+    top: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderBottomWidth: 0,
+    borderTopRightRadius: 24,
+  },
+  bottomLeft: {
+    bottom: 0,
+    left: 0,
+    borderRightWidth: 0,
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 24,
+  },
+  bottomRight: {
+    bottom: 0,
+    right: 0,
+    borderLeftWidth: 0,
+    borderTopWidth: 0,
+    borderBottomRightRadius: 24,
+  },
+  laser: { position: 'absolute', left: 0, right: 0, height: 2, zIndex: 10 },
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  processingText: {
+    color: 'white',
+    marginTop: 16,
+    fontSize: 12,
+    fontWeight: '900',
+    letterSpacing: 2,
+  },
+  footer: { padding: 24, paddingBottom: 50 },
+  capturePanel: {
+    padding: 24,
+    borderRadius: 32,
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  hint: { fontSize: 13, fontWeight: '600', marginBottom: 20, opacity: 0.8 },
+  captureBtn: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 4,
+    padding: 4,
+  },
+  captureInner: {
+    flex: 1,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  permissionContainer: { flex: 1, justifyContent: 'center', padding: 30 },
+  permissionCard: {
     padding: 40,
+    borderRadius: 32,
+    alignItems: 'center',
+    overflow: 'hidden',
   },
-  permissionText: {
+  permissionText: { fontSize: 24, fontWeight: '900', marginTop: 24 },
+  permissionSubText: {
     textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
-    marginVertical: 24,
+    fontSize: 14,
+    marginTop: 12,
+    lineHeight: 20,
+    marginBottom: 32,
   },
-  btn: { paddingHorizontal: 32, paddingVertical: 18, borderRadius: 18 },
+  btn: {
+    width: '100%',
+    height: 60,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   btnText: { color: 'white', fontWeight: '800', fontSize: 16 },
-  cancelBtn: { marginTop: 24 },
+  cancelLink: { marginTop: 20 },
 });
