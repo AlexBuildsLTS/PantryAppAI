@@ -27,7 +27,6 @@ import {
   Modal,
   ActivityIndicator,
   Platform,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -45,12 +44,12 @@ import QRCode from 'react-native-qrcode-svg';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { BiometricService } from '../../services/BiometricService';
-import { supabase } from '../../services/supabase';
+import { supabase } from '../../lib/supabase';
 
 export default function SettingsScreen() {
   // --- DESIGN SYSTEM CONSUMPTION ---
   const { colors, shadows, isDark, toggleTheme } = useTheme();
-  const { profile, user, household, signOut, refreshMetadata } = useAuth();
+  const { profile, user, household, refreshMetadata } = useAuth();
 
   // --- MODULE 1: ATOMIC STATE MANAGEMENT ---
   const [isEditing, setIsEditing] = useState(false);
@@ -130,7 +129,7 @@ export default function SettingsScreen() {
         } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
         // Atomic update to the profile record
-        const { error: updateError } = await (supabase as any)
+        const { error: updateError } = await supabase
           .from('profiles')
           .update({ avatar_url: publicUrl })
           .eq('id', user.id);
@@ -161,8 +160,8 @@ export default function SettingsScreen() {
 
     setLoading(true);
     try {
-      const { error } = await (supabase as any)
-        .from('profiles') // Explicitly specify the table
+      const { error } = await supabase
+        .from('profiles')
         .update({ full_name: newName.trim() })
         .eq('id', user.id);
 
@@ -236,7 +235,6 @@ export default function SettingsScreen() {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            await signOut();
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
         },
@@ -248,19 +246,19 @@ export default function SettingsScreen() {
    * MODULE 7: STYLING ORCHESTRATION
    * Logic: Memoized styles ensure 60FPS transitions during theme swaps.
    */
-const cardStyle = useMemo(
-  () => [
-    styles.glassCard,
-    {
-      backgroundColor: isDark
-        ? 'rgba(30, 41, 59, 0.7)'
-        : 'rgba(255, 255, 255, 0.85)',
-      borderColor: colors.border,
-    },
-    !isDark && shadows.medium, // This will now use the high-contrast light mode shadow
-  ],
-  [colors.border, isDark, shadows.medium]
-);
+  const cardStyle = useMemo(
+    () => [
+      styles.glassCard,
+      {
+        backgroundColor: isDark
+          ? 'rgba(30, 41, 59, 0.7)'
+          : 'rgba(255, 255, 255, 0.85)',
+        borderColor: colors.border,
+      },
+      !isDark && shadows.medium, // This will now use the high-contrast light mode shadow
+    ],
+    [colors.border, isDark, shadows.medium]
+  );
 
   // QR Logic: Strictly typed non-nullable link
   const inviteLink = useMemo(

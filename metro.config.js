@@ -1,12 +1,14 @@
+/**
+ * @file metro.config.js
+ * @description Metro Bundler configuration for NativeWind 4.
+ */
 const { getDefaultConfig } = require('expo/metro-config');
 const { withNativeWind } = require('nativewind/metro');
 
 const config = getDefaultConfig(__dirname);
-config.resolver.sourceExts.push('css');
 
-module.exports = withNativeWind(config, {
-  // Matches the output path in the build command above
+// Direct NativeWind to process global.css as the entry point
+module.exports = withNativeWind(config, { 
   input: './global.css',
-  projectRoot: __dirname,
-  inlineStyles: true,
+  inlineStyles: true 
 });

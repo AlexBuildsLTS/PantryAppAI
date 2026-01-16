@@ -37,11 +37,9 @@ export function useFrameworkReady(): boolean {
         // 2. Execute the native framework signal
         window.frameworkReady();
       } catch (error) {
-        // 3. Fail silently in production to avoid disrupting the UI
-        console.warn('[FrameworkReady] Native signal failed:', error);
       }
     }
-    
+
     // 4. Update the internal state to signal hydration completion
     setIsReady(true);
   }, []); // Run exactly once on mount

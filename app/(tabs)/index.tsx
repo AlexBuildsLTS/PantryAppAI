@@ -28,7 +28,7 @@ import { BlurView } from 'expo-blur';
 
 
 // System Infrastructure
-import { supabase } from '../../services/supabase';
+import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Tables } from '../../types/database.types';
@@ -42,6 +42,12 @@ const SPACING = 16;
 const CATEGORIES = ['All', 'Produce', 'Dairy', 'Protein', 'Pantry', 'Frozen', 'Other'] as const;
 const SEARCH_DEBOUNCE_MS = 350;
 
+// Types for AddItemModal's initialData
+interface InitialData {
+  name?: string;
+  quantity?: number;
+  expiry_date?: string;
+}
 type PantryItemWithStorage = Tables<'pantry_items'> & {
   storage_locations?: { name: string; location_type: string } | null;
 };
@@ -94,7 +100,7 @@ function useInventoryFilters(items: PantryItemWithStorage[]) {
 
 function useAIScanner(householdId?: string, userId?: string) {
   const [isProcessingAI, setIsProcessingAI] = useState(false);
-  const [scannedItemData, setScannedItemData] = useState<Partial<Tables<'pantry_items'>> | null>(null);
+  const [scannedItemData, setScannedItemData] = useState<InitialData | null>(null);
   const [isAddModalVisible, setIsAddModalVisible] = useState(false);
   const [isScannerVisible, setIsScannerVisible] = useState(false);
 
@@ -113,7 +119,12 @@ function useAIScanner(householdId?: string, userId?: string) {
     },
     onSuccess: (data) => {
       if (data?.detectedItems?.[0]) {
-        setScannedItemData(data.detectedItems[0]);
+        const detectedItem = data.detectedItems[0];
+        setScannedItemData({
+          name: detectedItem.name,
+          quantity: detectedItem.quantity,
+          expiry_date: detectedItem.expiry_date || undefined, // Ensure it's string or undefined
+        });
         setIsAddModalVisible(true);
       } else {
         Alert.alert('No Items Detected', 'The AI could not detect any food items in the image.');
@@ -423,7 +434,7 @@ export default function PantryScreen() {
       <AddItemModal
         isVisible={isAddModalVisible}
         onClose={() => setIsAddModalVisible(false)}
-        initialData={scannedItemData as ThemeColors}
+        initialData={scannedItemData ?? undefined}
       />
 
       {isScannerVisible && (

@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  // Added all subdirectories to ensure no class is ever "missed"
+  // CRITICAL: Force 'class' mode to stop the darkMode crash in ThemeContext
+  darkMode: 'class',
   content: [
     './app/**/*.{js,jsx,ts,tsx}',
     './components/**/*.{js,jsx,ts,tsx}',
@@ -12,9 +13,9 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        // Your design palette
-        primary: '#64FFDA',
+        primary: '#10B981',
         background: '#0A0A0A',
+        surface: '#121212',
         border: '#27272A',
       },
     },

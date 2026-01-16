@@ -1,11 +1,10 @@
 /**
- * @file shopping.tsx
+ * @file app/(tabs)/shopping.tsx
  * @description Master Grocery Supply Chain & Aisle-Sorting Engine.
- * AAA+ DESIGN STANDARDS:
- * 1. REAL-TIME RESOLVER: Ensures high-availability of the 'Main Grocery' list.
- * 2. AISLE INTELLIGENCE: Auto-groups items by category (Produce, Dairy, etc.).
- * 3. PANTRY SYNC: Atomic batch-migration of bought items to inventory.
- * 4. DEPTH UI: High-intensity shadows and BlurView layering.
+ * FIXES: 
+ * 1. Import Resolution: Points to ../../lib/supabase singleton.
+ * 2. Schema Sync: Restock logic matches NOT NULL 'expiry_date' in pantry_items.
+ * 3. Modern Styling: Uses boxShadow for High-Fidelity Web/Native parity.
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -21,9 +20,10 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Feather, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import Animated, {
@@ -32,9 +32,9 @@ import Animated, {
   LinearTransition,
 } from 'react-native-reanimated';
 
-// Infrastructure
-import { supabase } from '../../services/supabase';
-import { Tables, TablesInsert } from '../../types/database.types';
+// INTERNAL SYSTEM CORE
+import { supabase } from '../../lib/supabase';
+import { Tables } from '../../types/database.types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -42,7 +42,7 @@ type ShoppingListItem = Tables<'shopping_list_items'>;
 type ShoppingList = Tables<'shopping_lists'>;
 
 export default function ShoppingScreen() {
-  const { colors, shadows, isDark } = useTheme();
+  const { colors, isDark } = useTheme();
   const { household, user } = useAuth();
   const queryClient = useQueryClient();
   const [newItemName, setNewItemName] = useState('');
@@ -51,11 +51,13 @@ export default function ShoppingScreen() {
 
   /**
    * MODULE 1: ACTIVE LIST RESOLVER
+   * Description: Fetches or bootstraps the primary household shopping list.
    */
-  const { data: activeList } = useQuery({
+  const { data: activeList, isLoading: isListLoading } = useQuery({
     queryKey: ['active-list', householdId],
     queryFn: async () => {
       if (!householdId) return null;
+
       const { data, error } = await supabase
         .from('shopping_lists')
         .select('*')
@@ -66,15 +68,17 @@ export default function ShoppingScreen() {
       if (error) throw error;
 
       if (!data) {
-        const insertData: TablesInsert<'shopping_lists'> = {
-          household_id: householdId,
-          name: 'Main Grocery'
-        };
+        // Create initial 'Main Grocery' list for new households
         const { data: newList, error: createError } = await supabase
           .from('shopping_lists')
-          .insert(insertData)
+          .insert({
+            household_id: householdId,
+            name: 'Main Grocery',
+            is_completed: false
+          })
           .select()
           .single();
+
         if (createError) throw createError;
         return newList as ShoppingList;
       }
@@ -84,12 +88,13 @@ export default function ShoppingScreen() {
   });
 
   /**
-   * MODULE 2: DATA HYDRATION
+   * MODULE 2: ITEM HYDRATION
    */
   const {
     data: items = [],
     refetch,
     isRefetching,
+    isLoading: isItemsLoading
   } = useQuery({
     queryKey: ['shopping-items', activeList?.id],
     queryFn: async () => {
@@ -99,6 +104,7 @@ export default function ShoppingScreen() {
         .select('*')
         .eq('list_id', activeList.id)
         .order('created_at', { ascending: false });
+
       if (error) throw error;
       return data as ShoppingListItem[];
     },
@@ -106,7 +112,7 @@ export default function ShoppingScreen() {
   });
 
   /**
-   * MODULE 3: AISLE INTELLIGENCE (Categorization)
+   * MODULE 3: AISLE INTELLIGENCE (Automatic Categorization)
    */
   const groupedItems = useMemo(() => {
     const groups: Record<string, ShoppingListItem[]> = {};
@@ -125,24 +131,23 @@ export default function ShoppingScreen() {
   }, [items]);
 
   /**
-   * MODULE 4: MUTATIONS
+   * MODULE 4: MUTATIONS (Atomic Supply Chain Operations)
    */
   const addItemMutation = useMutation({
     mutationFn: async (name: string) => {
       if (!activeList?.id || !user?.id) return;
-      const insertItem: TablesInsert<'shopping_list_items'> = {
-        name,
+      return supabase.from('shopping_list_items').insert({
         list_id: activeList.id,
+        name,
         added_by: user.id,
-        quantity: 1,
         category: 'Pantry Essentials',
-      };
-      return supabase.from('shopping_list_items').insert(insertItem);
+        is_bought: false
+      });
     },
     onSuccess: () => {
       setNewItemName('');
       queryClient.invalidateQueries({ queryKey: ['shopping-items'] });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     },
   });
 
@@ -150,12 +155,12 @@ export default function ShoppingScreen() {
     mutationFn: async ({ id, status }: { id: string; status: boolean }) => {
       return supabase
         .from('shopping_list_items')
-        .update({ is_bought: !status })
+        .update({ is_bought: !status } as any)
         .eq('id', id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shopping-items'] });
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     },
   });
 
@@ -164,28 +169,35 @@ export default function ShoppingScreen() {
       const boughtItems = items.filter((i) => i.is_bought);
       if (boughtItems.length === 0 || !householdId || !user?.id) return;
 
-      const pantryInserts: TablesInsert<'pantry_items'>[] = boughtItems.map((item) => ({
-        name: item.name,
-        quantity: item.quantity || 1,
-        category: item.category,
+      // Map bought items to Pantry Schema
+      // FIX: Added 'expiry_date' to satisfy NOT NULL database constraint
+      const pantryInserts = boughtItems.map((item) => ({
         household_id: householdId,
         user_id: user.id,
-        status: 'fresh',
+        name: item.name,
+        category: item.category || 'Other',
+        quantity: item.quantity || 1,
+        unit: 'pcs',
+        status: 'fresh' as const,
+        expiry_date: new Date(Date.now() + 7 * 86400000).toISOString()
       }));
 
+      // 1. Commit to Inventory
       const { error: insertError } = await supabase.from('pantry_items').insert(pantryInserts);
       if (insertError) throw insertError;
 
+      // 2. Clear from Shopping List
       const { error: deleteError } = await supabase
         .from('shopping_list_items')
         .delete()
         .in('id', boughtItems.map((i) => i.id));
+
       if (deleteError) throw deleteError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['shopping-items'] });
-      queryClient.invalidateQueries({ queryKey: ['pantry-items'] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      queryClient.invalidateQueries({ queryKey: ['pantry-inventory'] });
+      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert('Pantry Synced', 'Bought items moved to inventory.');
     },
   });
@@ -196,11 +208,11 @@ export default function ShoppingScreen() {
         entering={FadeInRight.delay(index * 30)}
         exiting={FadeOutLeft}
         layout={LinearTransition.springify()}
-        style={[styles.cardWrapper, !isDark && shadows.small]}
+        style={styles.cardWrapper}
       >
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => toggleMutation.mutate({ id: item.id, status: item.is_bought })}
+          onPress={() => toggleMutation.mutate({ id: item.id, status: Boolean(item.is_bought) })}
           style={[
             styles.itemCard,
             { backgroundColor: colors.surface, borderColor: colors.border },
@@ -227,17 +239,18 @@ export default function ShoppingScreen() {
         </TouchableOpacity>
       </Animated.View>
     ),
-    [colors, isDark, shadows, toggleMutation]
+    [colors, toggleMutation]
   );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+        {/* Header */}
         <View style={styles.header}>
           <View>
             <Text style={[styles.title, { color: colors.text }]}>Supply Chain</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              {household?.name || 'Active Household'} • {items.length} Items
+              {household?.name || 'Active Vault'} • {items.length} Items
             </Text>
           </View>
 
@@ -252,11 +265,12 @@ export default function ShoppingScreen() {
           )}
         </View>
 
-        <View style={[styles.inputContainer, !isDark && shadows.medium]}>
+        {/* Input Bar */}
+        <View style={styles.inputContainer}>
           <BlurView intensity={isDark ? 20 : 60} style={[styles.inputWrapper, { borderColor: colors.border }]}>
             <TextInput
               style={[styles.input, { color: colors.text }]}
-              placeholder="Add item..."
+              placeholder="Provision name..."
               placeholderTextColor={colors.textSecondary}
               value={newItemName}
               onChangeText={setNewItemName}
@@ -271,27 +285,34 @@ export default function ShoppingScreen() {
           </BlurView>
         </View>
 
-        <SectionList
-          sections={groupedItems}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          stickySectionHeadersEnabled
-          refreshControl={
-            <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
-          }
-          renderSectionHeader={({ section: { title } }) => (
-            <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: colors.primary }]}>{title.toUpperCase()}</Text>
-            </BlurView>
-          )}
-          renderItem={renderItem}
-          ListEmptyComponent={() => (
-            <View style={styles.empty}>
-              <MaterialCommunityIcons name="cart-off" size={64} color={colors.border} />
-              <Text style={{ color: colors.textSecondary, marginTop: 16, fontWeight: '600' }}>Your list is empty.</Text>
-            </View>
-          )}
-        />
+        {/* Content */}
+        {isListLoading || isItemsLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={colors.primary} size="large" />
+          </View>
+        ) : (
+          <SectionList
+            sections={groupedItems}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.listContent}
+            stickySectionHeadersEnabled
+            refreshControl={
+              <RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />
+            }
+            renderSectionHeader={({ section: { title } }) => (
+              <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: colors.primary }]}>{title.toUpperCase()}</Text>
+              </BlurView>
+            )}
+            renderItem={renderItem}
+            ListEmptyComponent={() => (
+              <View style={styles.empty}>
+                <MaterialCommunityIcons name="cart-off" size={64} color={colors.border} />
+                <Text style={{ color: colors.textSecondary, marginTop: 16, fontWeight: '600' }}>Supply chain is empty.</Text>
+              </View>
+            )}
+          />
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -300,23 +321,41 @@ export default function ShoppingScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 24 },
-  title: { fontSize: 32, fontWeight: '900', letterSpacing: -1 },
-  subtitle: { fontSize: 13, fontWeight: '600', marginTop: 4, opacity: 0.6 },
-  restockBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, gap: 8 },
-  restockText: { fontSize: 12, fontWeight: '900' },
+  title: { fontSize: 34, fontWeight: '900', letterSpacing: -1 },
+  subtitle: { fontSize: 13, fontWeight: '700', marginTop: 4, opacity: 0.6 },
+  restockBtn: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 14, gap: 8 },
+  restockText: { fontSize: 11, fontWeight: '900', letterSpacing: 1 },
   inputContainer: { paddingHorizontal: 24, marginBottom: 20 },
-  inputWrapper: { flexDirection: 'row', height: 60, borderRadius: 20, borderWidth: 1, paddingLeft: 20, alignItems: 'center', overflow: 'hidden' },
+  inputWrapper: {
+    flexDirection: 'row',
+    height: 64,
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingLeft: 20,
+    alignItems: 'center',
+    overflow: 'hidden',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.1)' // FIXED: Uses boxShadow for standard compatibility
+  },
   input: { flex: 1, fontSize: 16, fontWeight: '600' },
-  addBtn: { width: 44, height: 44, borderRadius: 12, marginRight: 8, justifyContent: 'center', alignItems: 'center' },
-  listContent: { paddingHorizontal: 24, paddingBottom: 100 },
+  addBtn: { width: 48, height: 48, borderRadius: 14, marginRight: 8, justifyContent: 'center', alignItems: 'center' },
+  listContent: { paddingHorizontal: 24, paddingBottom: 120 },
   sectionHeader: { paddingVertical: 12, marginHorizontal: -24, paddingHorizontal: 24, marginBottom: 12 },
   sectionTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
-  cardWrapper: { marginBottom: 10 },
-  itemCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 18, borderRadius: 22, borderWidth: 1 },
+  cardWrapper: { marginBottom: 12 },
+  itemCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 20,
+    borderRadius: 28,
+    borderWidth: 1,
+    boxShadow: '0 2px 8px rgba(0,0,0,0.03)' // FIXED: Standard compatibility
+  },
   itemLeft: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  checkbox: { width: 22, height: 22, borderRadius: 7, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
-  itemName: { fontSize: 16, fontWeight: '700' },
+  checkbox: { width: 24, height: 24, borderRadius: 8, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  itemName: { fontSize: 17, fontWeight: '700' },
   strikethrough: { textDecorationLine: 'line-through', opacity: 0.6 },
-  qtyText: { fontWeight: '900', fontSize: 14 },
-  empty: { alignItems: 'center', marginTop: 100 }
+  qtyText: { fontWeight: '900', fontSize: 14, opacity: 0.8 },
+  empty: { alignItems: 'center', marginTop: 100 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' }
 });

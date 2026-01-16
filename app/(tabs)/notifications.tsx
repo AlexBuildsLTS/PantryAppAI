@@ -29,7 +29,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 // Internal Systems
-import { supabase } from '../../services/supabase';
+import { supabase } from '../../lib/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
 import { Tables } from '../../types/database.types';
 

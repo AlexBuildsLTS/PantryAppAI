@@ -1,3 +1,20 @@
+/**
+ * @file global.css
+ * @description Master CSS stylesheet for Pantry Pal.
+ */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Force standard dark mode handling for Web compatibility */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+  }
+  .dark {
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+    color-scheme: dark;
+  }
+}

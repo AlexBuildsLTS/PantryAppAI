@@ -13,7 +13,7 @@ type SupportTicket = Database['public']['Tables']['support_tickets']['Row'];
 type UserRole = Database['public']['Tables']['profiles']['Row']['role'];
 
 // Constants for better maintainability
-const ACTIVE_TICKET_STATUSES = ['open', 'pending', 'in_progress'];
+const ACTIVE_TICKET_STATUSES: Database['public']['Enums']['ticket_status'][] = ['OPEN', 'IN_PROGRESS'];
 const MIN_BAN_DURATION_DAYS = 1;
 const MAX_BAN_DURATION_DAYS = 365;
 
@@ -45,7 +45,7 @@ export class AdminService {
         if (!isValidUUID(userId)) {
             throw new Error('Invalid user ID: must be a valid UUID.');
         }
-        if (!isValidUserRole(newRole)) {
+        if (typeof newRole !== 'string' || !isValidUserRole(newRole)) {
             throw new Error(`Invalid user role: ${newRole}. Must be one of member, premium, moderator, admin.`);
         }
 
@@ -54,7 +54,8 @@ export class AdminService {
             updated_at: new Date().toISOString()
         };
 
-        const { data, error } = await (supabase as any)
+
+        const { data, error } = await supabase
             .from('profiles')
             .update(updatePayload)
             .eq('id', userId)

@@ -6,6 +6,7 @@ node_modules/
 dist/
 web-build/
 expo-env.d.ts
+.expo-shared/
 
 # native
 *.orig.*
@@ -37,3 +38,7 @@ yarn-error.*
 
 # IDE
 .vscode/
+.github/
+.idea/
+*.sublime-workspace
+*.sublime-project

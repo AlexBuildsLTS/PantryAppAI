@@ -1,13 +1,15 @@
 /**
  * @file ShoppingService.ts
  * @description Enterprise orchestration for automated replenishment.
+ * FIX: Re-routed imports to the unified lib/supabase singleton.
  */
 
-import { supabase } from './supabase';
+import { supabase } from '../lib/supabase';
 
 export class ShoppingService {
   /**
    * Adds a batch of missing ingredients to the active household list.
+   * Stability: Uses .maybeSingle() to handle cases where no list exists.
    */
   static async addMissingToGroceries(householdId: string, items: string[]) {
     try {
@@ -18,21 +20,25 @@ export class ShoppingService {
         .eq('household_id', householdId)
         .eq('is_completed', false)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       // 2. Create list if none exists
       if (!activeList) {
-        const { data } = await supabase
+        const { data, error: createError } = await supabase
           .from('shopping_lists')
           .insert({ household_id: householdId, name: 'Recipe Essentials' })
           .select()
           .single();
+        
+        if (createError) throw createError;
         activeList = data;
       }
 
       // 3. Batch insert items
+      if (!activeList?.id) throw new Error('Active shopping list ID not found');
+      
       const inserts = items.map((name) => ({
-        list_id: activeList?.id,
+        list_id: activeList!.id,
         name: name,
         quantity: 1,
         is_bought: false,
