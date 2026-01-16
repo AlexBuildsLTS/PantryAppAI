@@ -1,26 +1,23 @@
 /**
  * @module useFrameworkReady
  * @description
- * A high-level lifecycle hook designed to signal the completion of the
- * JavaScript framework initialization. This is critical for preventing
- * race conditions during the mounting of heavy native modules (e.g., Camera,
- * Reanimated, and Auth hydration).
- * * @example
- * useFrameworkReady();
+ * An enterprise-grade lifecycle hook that signals the completion of the 
+ * JavaScript framework initialization. Now modified to return a boolean 
+ * state to orchestrate root layout mounting and splash screen management.
+ * * @returns {boolean} frameworkReady - Returns true once the framework is hydrated.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 /**
  * Extends the global Window interface to include the frameworkReady
- * signal, which is often used by automated testing suites and
- * performance monitoring tools to measure "Time to Interactive" (TTI).
+ * signal, preventing TypeScript "property does not exist" errors.
  */
 declare global {
   interface Window {
     /**
-     * Optional signal to external environments (like WebViews or
-     * monitoring tools) that the React Native framework is fully hydrated.
+     * Optional signal used by Expo/React Native performance tools 
+     * to measure "Time to Interactive" (TTI).
      */
     frameworkReady?: () => void;
   }
@@ -28,20 +25,26 @@ declare global {
 
 /**
  * useFrameworkReady
- * * Orchestrates the post-mount signal to ensure that external listeners
- * and internal native bridges are aware that the component tree is stable.
+ * Orchestrates the post-mount signal and provides a stateful ready flag.
  */
-export function useFrameworkReady(): void {
+export function useFrameworkReady(): boolean {
+  const [isReady, setIsReady] = useState(false);
+
   useEffect(() => {
     // 1. Check if the global window object exists (safe for Web/SSR)
     if (typeof window !== 'undefined' && window.frameworkReady) {
       try {
-        // 2. Execute the signal
+        // 2. Execute the native framework signal
         window.frameworkReady();
       } catch (error) {
         // 3. Fail silently in production to avoid disrupting the UI
-        console.warn('[FrameworkReady] Signal failed to execute:', error);
+        console.warn('[FrameworkReady] Native signal failed:', error);
       }
     }
+    
+    // 4. Update the internal state to signal hydration completion
+    setIsReady(true);
   }, []); // Run exactly once on mount
+
+  return isReady;
 }

@@ -19,7 +19,7 @@
 
 ### 🤖 **AI-Vision & Recognition**
 
-- **Multi-Object Scanning**: Utilizing GPT-4 Vision and Google Gemini to identify entire grocery hauls from a single photo.
+- **Multi-Object Scanning**: Google Gemini Vision to identify entire grocery hauls from a single photo.
 - **Auto-Categorization**: Automatic tagging of items (Produce, Dairy, Meat) using AI metadata.
 - **Confidence Scoring**: Real-time validation of scanned items with high-fidelity visual feedback.
 

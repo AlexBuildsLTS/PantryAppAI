@@ -1,12 +1,11 @@
 /**
- * @file analytics.tsx
+ * @file app/(tabs)/analytics.tsx
  * @description Enterprise-Grade Predictive Analytics & Sustainability Engine.
- * * AAA+ ARCHITECTURE:
- * 1. Time-Series Forecasting: Integrates 'PredictionService' for 7-day risk windows.
- * 2. Ecological Impact Engine: Converts food mass (grams) into CO2 offset metrics.
- * 3. Bento-Grid Orchestration: Sophisticated layout using dynamic spacing and shadows.
- * 4. Micro-Interaction Engine: Reanimated 3 orchestration with spring-based entry.
- * 5. Data Pipeline: Joins 'pantry_items' and household metadata for full-spectrum analysis.
+ * * ARCHITECTURAL MODULES:
+ *  HOUSEHOLD SYNC: Primary data hydration via household_id for collaboration.
+ *  ECOLOGICAL IMPACT ENGINE: Calculates CO2 offset based on inventory status.
+ *  TYPE-SAFE PIPELINE: Strict parity with Supabase pantry_items schema.
+ *  GLASSMORPHISM DESIGN: High-fidelity UI with Reanimated 4 spring physics.
  */
 
 import React, { useMemo } from 'react';
@@ -18,7 +17,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
@@ -37,18 +35,17 @@ import { useAuth } from '../../contexts/AuthContext';
 import { PredictionService } from '../../services/PredictionService';
 import { Tables } from '../../types/database.types';
 
-const { width } = Dimensions.get('window');
+// Strict Type Definition from Supabase Schema
 type PantryItem = Tables<'pantry_items'>;
 
 export default function AnalyticsScreen() {
-  const { colors, mode } = useTheme();
-  const { household } = useAuth();
-  const isDark = mode === 'dark';
+  const { colors, isDark } = useTheme();
+  const { user, household } = useAuth();
 
   /**
-   * MODULE 1: ANALYTICS DATA PIPELINE
-   * Description: Hydrates the dashboard with raw inventory data across all categories.
-   * Implementation: Leverages TanStack Query for high-fidelity state management.
+   * MODULE 1: DATA PIPELINE (HOUSEHOLD SYNC)
+   * Description: Hydrates inventory data using household_id to support collaboration.
+   * Fix: Switched 'food_items' to 'pantry_items' to match Supabase schema.
    */
   const {
     data: items = [],
@@ -59,10 +56,12 @@ export default function AnalyticsScreen() {
     queryKey: ['analytics-inventory', household?.id],
     queryFn: async () => {
       if (!household?.id) return [];
+
       const { data, error } = await supabase
-        .from('pantry_items')
+        .from('pantry_items') // Matches schema: public.pantry_items
         .select('*')
         .eq('household_id', household.id);
+
       if (error) throw error;
       return data as PantryItem[];
     },
@@ -70,32 +69,32 @@ export default function AnalyticsScreen() {
   });
 
   /**
-   * MODULE 2: COMPUTATIONAL INTELLIGENCE ENGINE
-   * Description: Processes raw database timestamps into predictive sustainability metrics.
-   * Business Logic:
-   * - Efficiency: Ratio of consumed vs (expired + wasted) items.
-   * - CO2: Weighted preventative metric based on food mass saved.
+   * MODULE 2: COMPUTATIONAL INTELLIGENCE
+   * Description: Processes raw entries into sustainability KPIs and predictive risks.
+   * Fix: Added null checks for expiry_date to resolve TypeScript Date errors.
    */
   const analytics = useMemo(() => {
     const total = items.length;
-    const wasted = items.filter(
-      (i) => i.status === 'expired' || i.status === 'wasted'
-    ).length;
-    const consumed = items.filter((i) => i.status === 'consumed').length;
-    const efficiency =
-      total > 0 ? Math.round(((total - wasted) / total) * 100) : 100;
 
+    // Status-based efficiency (Fresh vs Expired/Wasted)
+    const healthyItems = items.filter((i) => i.status === 'fresh').length;
+
+    const efficiency =
+      total > 0 ? Math.round((healthyItems / total) * 100) : 100;
+
+    // CO2 Calculation: Based on weight_grams from schema (defaulting to 500g if null)
     const totalMassKg =
-      items.reduce((acc, curr) => acc + (curr.weight_grams || 500), 0) / 1000;
+      items.reduce((acc, curr) => acc + (Number(curr.weight_grams) || 500), 0) /
+      1000;
+
     const co2Saved = (totalMassKg * (efficiency / 100) * 2.5).toFixed(1);
+
+    // Predictive Risk Analysis (7-day window)
     const forecast = PredictionService.getWasteForecast(items);
 
-    return { total, wasted, consumed, efficiency, co2Saved, forecast };
+    return { total, healthyItems, efficiency, co2Saved, forecast };
   }, [items]);
 
-  /**
-   * MODULE 3: HYDRATION GUARD
-   */
   if (isLoading) {
     return (
       <View style={[styles.center, { backgroundColor: colors.background }]}>
@@ -120,24 +119,28 @@ export default function AnalyticsScreen() {
           />
         }
       >
-        {/* MODULE 4: INTELLIGENCE HEADER */}
-        <Animated.View entering={FadeInDown} style={styles.header}>
+        {/* MODULE 3: INTELLIGENCE HEADER */}
+        <Animated.View
+          entering={FadeInDown.duration(600)}
+          style={styles.header}
+        >
           <Text style={[styles.title, { color: colors.text }]}>
             Intelligence
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            Advanced supply chain forecasting & CO2 impact.
+            Monitoring {household?.name || 'Pantry'} with predictive CO2
+            modeling.
           </Text>
         </Animated.View>
 
-        {/* MODULE 5: PREDICTIVE FORECAST HERO */}
+        {/* MODULE 4: PREDICTIVE HERO CARD */}
         <Animated.View
-          entering={FadeInUp.delay(200)}
+          entering={FadeInUp.delay(200).springify()}
           style={[
             styles.heroCard,
             {
-              backgroundColor: colors.primary + '15',
-              borderColor: colors.primary + '30',
+              backgroundColor: colors.primary + '10',
+              borderColor: colors.primary + '25',
             },
           ]}
         >
@@ -154,7 +157,7 @@ export default function AnalyticsScreen() {
                 7-DAY WASTE WINDOW
               </Text>
               <Text style={[styles.kpiTitle, { color: colors.text }]}>
-                Predictive Analysis
+                Predictive Risk
               </Text>
             </View>
           </View>
@@ -167,14 +170,11 @@ export default function AnalyticsScreen() {
               <Text
                 style={[styles.statLabelNode, { color: colors.textSecondary }]}
               >
-                Critical Risk Items
+                Risk Items
               </Text>
             </View>
             <View
-              style={[
-                styles.vDivider,
-                { backgroundColor: colors.primary + '30' },
-              ]}
+              style={[styles.vDivider, { backgroundColor: colors.border }]}
             />
             <View style={styles.statNode}>
               <Text style={[styles.statVal, { color: colors.text }]}>
@@ -183,7 +183,7 @@ export default function AnalyticsScreen() {
               <Text
                 style={[styles.statLabelNode, { color: colors.textSecondary }]}
               >
-                Projected Loss
+                Est. Loss
               </Text>
             </View>
           </View>
@@ -191,12 +191,12 @@ export default function AnalyticsScreen() {
           <TouchableOpacity
             style={[styles.actionBtn, { backgroundColor: colors.primary }]}
           >
-            <MaterialCommunityIcons name="auto-fix" size={16} color="white" />
-            <Text style={styles.actionBtnText}>Prioritize with Chef AI</Text>
+            <MaterialCommunityIcons name="auto-fix" size={18} color="white" />
+            <Text style={styles.actionBtnText}>Chef AI Rescue</Text>
           </TouchableOpacity>
         </Animated.View>
 
-        {/* MODULE 6: BENTO GRID ARCHITECTURE */}
+        {/* MODULE 5: BENTO GRID ARCHITECTURE */}
         <View style={styles.bentoRow}>
           <Animated.View
             entering={FadeInUp.delay(400)}
@@ -211,7 +211,7 @@ export default function AnalyticsScreen() {
               </Text>
             </View>
             <Text style={[styles.bentoLabel, { color: colors.textSecondary }]}>
-              SYSTEM EFFICIENCY
+              HOUSEHOLD EFFICIENCY
             </Text>
           </Animated.View>
 
@@ -233,7 +233,7 @@ export default function AnalyticsScreen() {
                   { color: colors.textSecondary },
                 ]}
               >
-                TRACKED
+                TOTAL ITEMS
               </Text>
             </Animated.View>
             <Animated.View
@@ -245,7 +245,7 @@ export default function AnalyticsScreen() {
             >
               <Feather name="shield" size={20} color={colors.success} />
               <Text style={[styles.bentoSmallVal, { color: colors.text }]}>
-                {analytics.consumed}
+                {analytics.healthyItems}
               </Text>
               <Text
                 style={[
@@ -253,18 +253,18 @@ export default function AnalyticsScreen() {
                   { color: colors.textSecondary },
                 ]}
               >
-                SAVED
+                FRESH STATUS
               </Text>
             </Animated.View>
           </View>
         </View>
 
-        {/* MODULE 7: ECOLOGICAL SENTINEL CARD */}
+        {/* MODULE 6: ECOLOGICAL SENTINEL CARD */}
         <Animated.View entering={FadeInUp.delay(700)}>
           <BlurView
             intensity={30}
             tint={isDark ? 'dark' : 'light'}
-            style={[styles.impactCard, { borderColor: colors.success + '40' }]}
+            style={[styles.impactCard, { borderColor: colors.success + '30' }]}
           >
             <View style={styles.impactHeader}>
               <MaterialCommunityIcons
@@ -278,16 +278,19 @@ export default function AnalyticsScreen() {
             </View>
             <Text style={[styles.impactText, { color: colors.textSecondary }]}>
               You prevented{' '}
-              <Text style={{ color: colors.text, fontWeight: '900' }}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>
                 {analytics.co2Saved}kg of CO2
               </Text>{' '}
-              emissions. That is equivalent to planting{' '}
-              <Text style={{ fontWeight: '800' }}>2 trees</Text> this month.
+              emissions. This matches the absorption of{' '}
+              <Text style={{ color: colors.text, fontWeight: '800' }}>
+                2 trees
+              </Text>
+              .
             </Text>
           </BlurView>
         </Animated.View>
 
-        {/* MODULE 8: DYNAMIC RISK FEED */}
+        {/* MODULE 7: DYNAMIC RISK FEED */}
         <Text style={[styles.sectionTitle, { color: colors.text }]}>
           Action Feed
         </Text>
@@ -312,15 +315,19 @@ export default function AnalyticsScreen() {
                 <Text
                   style={[styles.riskMeta, { color: colors.textSecondary }]}
                 >
-                  Expires in{' '}
-                  {Math.ceil(
-                    (new Date(item.expiry_date!).getTime() - Date.now()) /
-                      86400000
-                  )}{' '}
-                  days
+                  {item.expiry_date
+                    ? `Expires in ${Math.ceil(
+                        (new Date(item.expiry_date).getTime() - Date.now()) /
+                          86400000
+                      )} days`
+                    : 'No expiry set'}
                 </Text>
               </View>
-              <Feather name="chevron-right" size={20} color={colors.border} />
+              <Feather
+                name="chevron-right"
+                size={20}
+                color={colors.textSecondary}
+              />
             </Animated.View>
           ))
         ) : (
@@ -331,7 +338,7 @@ export default function AnalyticsScreen() {
               color={colors.success}
             />
             <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-              Your inventory is fully optimized.
+              Inventory fully optimized. No immediate waste risks.
             </Text>
           </View>
         )}
@@ -347,9 +354,9 @@ const styles = StyleSheet.create({
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scrollContent: { padding: 24 },
   header: { marginBottom: 32 },
-  title: { fontSize: 40, fontWeight: '900', letterSpacing: -1.5 },
-  subtitle: { fontSize: 15, marginTop: 6, lineHeight: 22 },
-  heroCard: { padding: 28, borderRadius: 40, borderWidth: 1, marginBottom: 20 },
+  title: { fontSize: 36, fontWeight: '900', letterSpacing: -1 },
+  subtitle: { fontSize: 16, marginTop: 4, lineHeight: 22 },
+  heroCard: { padding: 24, borderRadius: 32, borderWidth: 1, marginBottom: 20 },
   heroHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -363,7 +370,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  kpiLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  kpiLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   kpiTitle: { fontSize: 22, fontWeight: '800' },
   heroStats: {
     flexDirection: 'row',
@@ -372,48 +379,47 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   statNode: { alignItems: 'center' },
-  statVal: { fontSize: 36, fontWeight: '900' },
-  statLabelNode: { fontSize: 11, fontWeight: '600', marginTop: 4 },
+  statVal: { fontSize: 32, fontWeight: '900' },
+  statLabelNode: { fontSize: 12, fontWeight: '600', marginTop: 4 },
   vDivider: { width: 1, height: 40 },
   actionBtn: {
-    height: 54,
-    borderRadius: 18,
+    height: 56,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 10,
+    gap: 12,
   },
   actionBtnText: { color: 'white', fontWeight: '800', fontSize: 15 },
   bentoRow: { flexDirection: 'row', gap: 16, marginBottom: 20 },
   bentoLarge: {
     flex: 1.2,
     padding: 24,
-    borderRadius: 36,
+    borderRadius: 32,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
   ring: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 10,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    borderWidth: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
-  ringVal: { fontSize: 24, fontWeight: '900' },
+  ringVal: { fontSize: 22, fontWeight: '900' },
   bentoLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   bentoCol: { flex: 1, gap: 16 },
-  bentoSmall: { flex: 1, padding: 20, borderRadius: 28, borderWidth: 1 },
-  bentoSmallVal: { fontSize: 22, fontWeight: '800', marginTop: 8 },
+  bentoSmall: { flex: 1, padding: 20, borderRadius: 24, borderWidth: 1 },
+  bentoSmallVal: { fontSize: 20, fontWeight: '800', marginTop: 8 },
   bentoSmallLabel: { fontSize: 9, fontWeight: '900', letterSpacing: 0.5 },
   impactCard: {
     padding: 24,
-    borderRadius: 36,
+    borderRadius: 32,
     borderWidth: 1,
     overflow: 'hidden',
-    backgroundColor: 'rgba(34, 197, 94, 0.05)',
     marginBottom: 32,
   },
   impactHeader: {
@@ -433,9 +439,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
-  riskMarker: { width: 4, height: 30, borderRadius: 2, marginRight: 16 },
+  riskMarker: { width: 4, height: 32, borderRadius: 2, marginRight: 16 },
   riskName: { fontSize: 16, fontWeight: '800' },
   riskMeta: { fontSize: 12, marginTop: 2, fontWeight: '500' },
   emptyState: { alignItems: 'center', marginTop: 40, gap: 12 },
-  emptyText: { fontSize: 14, fontStyle: 'italic', textAlign: 'center' },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+    paddingHorizontal: 40,
+    lineHeight: 20,
+  },
 });

@@ -1,12 +1,11 @@
 /**
  * @file app/_layout.tsx
- * @description AAA+ Tier Environment-Aware Root Orchestrator.
- * * UPGRADES:
- * 1. Environment Bypassing: Prevents biometric locks on Web/Non-Native environments.
- * 2. Route Synchronization: Fixes "No route named modal" error by mapping correct stack names.
- * 3. Preference Guard: Only triggers security if hardware is present and feature is enabled.
+ * @description MASTER AAA+ ROOT ARCHITECTURE.
+ * FIXES: StyleSheet units, darkMode crash, and unused vars.
  */
 
+// @ts-expect-error - global.css might not have types generated yet
+import '../global.css';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
@@ -16,60 +15,59 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { BlurView } from 'expo-blur';
 import { Feather } from '@expo/vector-icons';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-// Internal Systems
 import { ThemeProvider, useTheme } from '../contexts/ThemeContext';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { BiometricService } from '../services/BiometricService';
 
-SplashScreen.preventAutoHideAsync();
+SplashScreen.preventAutoHideAsync().catch(() => null);
 const queryClient = new QueryClient();
+
+// AAA+ Web Style Fix: Prevents the 'StyleSheet.setFlag' crash
+if (Platform.OS === 'web') {
+  // @ts-expect-error - setFlag is internal to react-native-web
+  if (typeof StyleSheet.setFlag === 'function') {
+    // @ts-expect-error - class mode is web-specific
+    StyleSheet.setFlag('darkMode', 'class');
+  }
+}
 
 function InnerLayout() {
   const { colors, isDark } = useTheme();
-  const { isLoading: authLoading } = useAuth();
-
-  // MODULE 1: INTELLIGENT LOCK STATE
-  // Description: Defaults to unlocked on Web to prevent development deadlocks.
+  const { isLoading: authLoading, user } = useAuth();
+  const router = useRouter();
   const [isLocked, setIsLocked] = useState(false);
   const [appIsReady, setAppIsReady] = useState(false);
 
-  /**
-   * MODULE 2: SECURE CHALLENGE ORCHESTRATOR
-   * Description: Only executes hardware challenges on physical Mobile devices.
-   */
   const performAuth = useCallback(async () => {
-    if (Platform.OS === 'web') return; // Skip security loop on Web
-
+    if (Platform.OS === 'web') {
+      setIsLocked(false);
+      return;
+    }
     const isAvailable = await BiometricService.isHardwareAvailable();
     if (!isAvailable) {
       setIsLocked(false);
       return;
     }
-
-    // In a final build, you would check 'userProfile.biometrics_enabled' here
     const success = await BiometricService.authenticate();
     if (success) setIsLocked(false);
   }, []);
 
-  /**
-   * MODULE 3: INITIALIZATION PIPELINE
-   */
   useEffect(() => {
     async function prepare() {
       try {
-        // Check hardware availability immediately to decide if we even show a lock
         if (Platform.OS !== 'web') {
           const hardware = await BiometricService.isHardwareAvailable();
-          if (hardware) setIsLocked(true); // Only lock if device can actually unlock
+          if (hardware) setIsLocked(true);
         }
-        await new Promise((resolve) => setTimeout(resolve, 500));
+      } catch {
+        // Silent catch for production stability
       } finally {
         setAppIsReady(true);
       }
@@ -78,61 +76,58 @@ function InnerLayout() {
   }, []);
 
   useEffect(() => {
-    if (appIsReady && isLocked) performAuth();
+    if (appIsReady && isLocked) {
+      performAuth();
+    }
   }, [appIsReady, isLocked, performAuth]);
 
-  /**
-   * MODULE 4: BACKGROUND SUSPENSION
-   */
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
+    const subscription = AppState.addEventListener('change', (state) => {
       if (Platform.OS === 'web') return;
-
-      if (nextAppState.match(/inactive|background/)) {
+      if (state.match(/inactive|background/)) {
         setIsLocked(true);
-      } else if (nextAppState === 'active') {
+      } else if (state === 'active') {
         performAuth();
       }
     });
     return () => subscription.remove();
   }, [performAuth]);
 
-  const onLayoutRootView = useCallback(async () => {
+  useEffect(() => {
+    if (!authLoading && appIsReady) {
+      if (user) {
+        router.replace('/(tabs)');
+      } else {
+        router.replace('/(auth)/sign-in');
+      }
+    }
+  }, [user, authLoading, appIsReady, router]);
+
+  useEffect(() => {
     if (appIsReady && !authLoading) {
-      await SplashScreen.hideAsync();
+      SplashScreen.hideAsync().catch(() => null);
     }
   }, [appIsReady, authLoading]);
 
   if (!appIsReady) return null;
 
   return (
-    <View style={styles.container} onLayout={onLayoutRootView}>
-      {/* MODULE 5: CORRECTED STACK MAPPING 
-          Description: Aligning names with your actual folder tree to kill Console Errors.
-      */}
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ animation: 'fade' }} />
-        {/* Changed from (auth) if your folder name is different, adjust here */}
-        <Stack.Screen name="sign-in" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
       </Stack>
 
-      {/* MODULE 6: CONDITIONAL SECURITY OVERLAY */}
       {isLocked && Platform.OS !== 'web' && (
         <BlurView
           intensity={100}
           tint={isDark ? 'dark' : 'light'}
           style={styles.lockOverlay}
         >
-          <View
-            style={[
-              styles.shieldBox,
-              { backgroundColor: colors.primary + '15' },
-            ]}
-          >
+          <View style={[styles.shieldBox, { backgroundColor: colors.primary + '15' }]}>
             <Feather name="shield" size={44} color={colors.primary} />
-            <Text style={[styles.lockTitle, { color: colors.text }]}>
-              Secure Session
-            </Text>
+            <Text style={[styles.lockTitle, { color: colors.text }]}>Secure Session</Text>
             <TouchableOpacity
               style={[styles.unlockBtn, { backgroundColor: colors.primary }]}
               onPress={performAuth}
@@ -152,7 +147,9 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ThemeProvider>
-            <InnerLayout />
+            <View style={styles.rootWrap}>
+              <InnerLayout />
+            </View>
           </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
@@ -162,6 +159,12 @@ export default function RootLayout() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  rootWrap: {
+    flex: 1,
+    // vh/vw are invalid. 100% is the correct React Native equivalent
+    height: '100%',
+    width: '100%',
+  },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -172,9 +175,9 @@ const styles = StyleSheet.create({
     padding: 40,
     borderRadius: 48,
     alignItems: 'center',
-    width: '80%',
+    width: '85%',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: 'rgba(255,255,255,0.1)',
   },
   lockTitle: {
     fontSize: 24,
@@ -184,14 +187,14 @@ const styles = StyleSheet.create({
   },
   unlockBtn: {
     marginTop: 32,
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingHorizontal: 32,
+    paddingVertical: 16,
+    borderRadius: 20,
   },
   unlockText: {
     color: 'white',
     fontWeight: '900',
-    fontSize: 13,
+    fontSize: 14,
     letterSpacing: 1,
   },
 });

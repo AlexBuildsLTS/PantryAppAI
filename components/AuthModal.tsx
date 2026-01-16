@@ -14,7 +14,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-export function AuthModal({ visible, onClose }: any) {
+interface AuthModalProps {
+  visible: boolean;
+  onClose: () => void;
+}
+
+export function AuthModal({ visible, onClose }: AuthModalProps) {
   const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -54,6 +59,7 @@ export function AuthModal({ visible, onClose }: any) {
                 ? 'Sign in to sync your pantry'
                 : 'Create an account to start tracking'}
             </Text>
+            
 
             {!isLogin && (
               <AuthInput

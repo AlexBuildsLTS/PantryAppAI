@@ -1,15 +1,10 @@
 /**
- * @file index.tsx
- * @description Master Inventory Intelligence Dashboard.
- * * AAA+ ARCHITECTURE:
- * 1. Relational Hydration: Joins 'storage_locations' for contextual metadata.
- * 2. Search Orchestration: High-performance debounced filtering.
- * 3. Haptic UI Loop: Integrated tactile feedback for all major interactions.
- * 4. Micro-Interaction Engine: Reanimated 3 layout and entry transitions.
- * 5. State Persistence: Integrated with TanStack Query for cache reliability.
+ * @file app/(tabs)/index.tsx
+ * @description Master Inventory Intelligence Dashboard (AAA+ Enterprise Tier).
+ * IMPROVED: Modularized components, custom hooks, enhanced error handling, performance optimizations.
  */
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,441 +13,456 @@ import {
   TouchableOpacity,
   TextInput,
   RefreshControl,
-  Dimensions,
   ActivityIndicator,
   Alert,
-  StatusBar,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
-import Animated, { FadeInDown, FadeOut, Layout } from 'react-native-reanimated';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import Animated, { FadeInDown, FadeOut, FadeInUp } from 'react-native-reanimated';
+import { useQuery, useMutation } from '@tanstack/react-query';
+import { StatusBar } from 'expo-status-bar';
+import { BlurView } from 'expo-blur';
 
-// Internal System Contexts & Services
+
+// System Infrastructure
 import { supabase } from '../../services/supabase';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { Tables } from '../../types/database.types';
 
-// Shared Global Components
+// Shared Components
 import AddItemModal from '../../components/AddItemModal';
 import AIFoodScanner from '../../components/AIFoodScanner';
 
-// Layout Infrastructure Constants
-const { width } = Dimensions.get('window');
+// Constants
 const SPACING = 16;
-const COLUMN_WIDTH = (width - SPACING * 3) / 2;
-const CATEGORIES = ['All', 'Produce', 'Dairy', 'Protein', 'Pantry', 'Frozen'];
+const CATEGORIES = ['All', 'Produce', 'Dairy', 'Protein', 'Pantry', 'Frozen', 'Other'] as const;
+const SEARCH_DEBOUNCE_MS = 350;
 
-// Composite Type for Database Joins
 type PantryItemWithStorage = Tables<'pantry_items'> & {
-  storage_locations: { name: string; location_type: string } | null;
+  storage_locations?: { name: string; location_type: string } | null;
 };
 
-export default function PantryScreen() {
-  const { colors } = useTheme();
-  const { household } = useAuth();
-  const queryClient = useQueryClient();
-
-  // Component State Management
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
-  const [isScannerVisible, setIsScannerVisible] = useState(false);
-  const [scannedItemData, setScannedItemData] = useState<any>(null);
-
-  /**
-   * MODULE 1: SEARCH DEBOUNCER
-   * Description: Prevents UI lag during heavy typing by delaying the
-   * filter calculation by 300ms.
-   */
-  useEffect(() => {
-    const handler = setTimeout(() => setDebouncedSearch(searchQuery), 300);
-    return () => clearTimeout(handler);
-  }, [searchQuery]);
-
-  /**
-   * MODULE 2: DATA HYDRATION ENGINE
-   * Description: Executes complex relational join between pantry items
-   * and storage locations using the Supabase PostgREST client.
-   */
-  const {
-    data: items = [],
-    isLoading,
-    refetch,
-    isRefetching,
-  } = useQuery({
-    queryKey: ['pantry-inventory', household?.id],
+// Custom Hooks
+function usePantryItems(enabled: boolean, householdId?: string) {
+  return useQuery({
+    queryKey: ['pantry-inventory', householdId],
     queryFn: async () => {
-      if (!household?.id) return [];
+      if (!householdId) return [];
       const { data, error } = await supabase
         .from('pantry_items')
         .select('*, storage_locations(name, location_type)')
-        .eq('household_id', household.id)
+        .eq('household_id', householdId)
         .order('expiry_date', { ascending: true });
-      if (error) throw error;
+      if (error) throw new Error(`Failed to fetch pantry items: ${error.message}`);
       return data as PantryItemWithStorage[];
     },
-    enabled: !!household?.id,
+    enabled,
+    retry: 3,
   });
+}
 
-  /**
-   * MODULE 3: OPTIMISTIC DELETION ENGINE
-   * Description: Provides instant UI feedback by removing items from local
-   * cache before the server confirms the delete operation.
-   */
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase
-        .from('pantry_items')
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
-    },
-    onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: ['pantry-inventory'] });
-      const previous = queryClient.getQueryData(['pantry-inventory']);
-      queryClient.setQueryData(['pantry-inventory'], (old: any) =>
-        old?.filter((item: any) => item.id !== deletedId)
-      );
-      return { previous };
-    },
-    onError: (err, id, context) => {
-      queryClient.setQueryData(['pantry-inventory'], context?.previous);
-      Alert.alert('System Error', 'Failed to remove inventory item.');
-    },
-    onSuccess: () =>
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success),
-  });
+function useInventoryFilters(items: PantryItemWithStorage[]) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [activeCategory, setActiveCategory] = useState<string>('All');
 
-  /**
-   * MODULE 4: URGENCY & STATUS LOGIC
-   * Description: Core business logic that translates database timestamps into
-   * human-readable urgency labels and associated color tokens.
-   */
-  const getUrgency = (item: PantryItemWithStorage) => {
-    if (!item.expiry_date) return { label: 'Fresh', color: colors.success };
-    const days = Math.ceil(
-      (new Date(item.expiry_date).getTime() - Date.now()) / 86400000
-    );
-    if (days < 0 || item.status === 'expired')
-      return { label: 'Expired', color: colors.error };
-    if (days <= 3) return { label: 'Critical', color: colors.warning };
-    return { label: 'Good', color: colors.primary };
-  };
+  useEffect(() => {
+    const handler = setTimeout(() => setDebouncedSearch(searchQuery), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
 
-  /**
-   * MODULE 5: FILTER ORCHESTRATION
-   * Description: Computational logic for handling multi-dimensional filtering
-   * (Category + Search Query) using memoization for 60fps performance.
-   */
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      const matchesSearch = item.name
-        ?.toLowerCase()
-        .includes(debouncedSearch.toLowerCase());
-      const matchesCategory =
-        activeCategory === 'All' || item.category === activeCategory;
+      const matchesSearch = item.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ?? false;
+      const matchesCategory = activeCategory === 'All' || item.category === activeCategory;
       return matchesSearch && matchesCategory;
     });
   }, [items, debouncedSearch, activeCategory]);
 
-  /**
-   * MODULE 6: ITEM RENDER (BENTO GRID CARD)
-   * Description: High-fidelity card component with Long-Press interaction
-   * for item removal and Haptic feedback.
-   */
-  const renderItem = ({
-    item,
-    index,
-  }: {
-    item: PantryItemWithStorage;
-    index: number;
-  }) => {
-    const urgency = getUrgency(item);
-    return (
-      <Animated.View
-        entering={FadeInDown.delay(index * 50)}
-        exiting={FadeOut}
-        layout={Layout.springify()}
-      >
+  return {
+    searchQuery,
+    setSearchQuery,
+    activeCategory,
+    setActiveCategory,
+    filteredItems,
+  };
+}
+
+function useAIScanner(householdId?: string, userId?: string) {
+  const [isProcessingAI, setIsProcessingAI] = useState(false);
+  const [scannedItemData, setScannedItemData] = useState<Partial<Tables<'pantry_items'>> | null>(null);
+  const [isAddModalVisible, setIsAddModalVisible] = useState(false);
+  const [isScannerVisible, setIsScannerVisible] = useState(false);
+
+  const processAIScanMutation = useMutation({
+    mutationFn: async (base64Image: string) => {
+      setIsProcessingAI(true);
+      try {
+        const { data, error } = await supabase.functions.invoke('pantry-ai-scanner', {
+          body: { image: base64Image, householdId, userId },
+        });
+        if (error) throw new Error(`AI scan failed: ${error.message}`);
+        return data;
+      } finally {
+        setIsProcessingAI(false);
+      }
+    },
+    onSuccess: (data) => {
+      if (data?.detectedItems?.[0]) {
+        setScannedItemData(data.detectedItems[0]);
+        setIsAddModalVisible(true);
+      } else {
+        Alert.alert('No Items Detected', 'The AI could not detect any food items in the image.');
+      }
+    },
+    onError: () => {
+      Alert.alert('AI Error', 'Scanner failed to process image. Please try again.');
+    },
+  });
+
+  const handleManualAdd = useCallback(() => {
+    setScannedItemData(null);
+    setIsAddModalVisible(true);
+  }, []);
+
+  const handleScannerTrigger = useCallback(() => {
+    setIsScannerVisible(true);
+  }, []);
+
+  const handleAIResultDetected = useCallback((base64: string) => {
+    setIsScannerVisible(false);
+    processAIScanMutation.mutate(base64);
+  }, [processAIScanMutation]);
+
+  return {
+    isProcessingAI,
+    scannedItemData,
+    isAddModalVisible,
+    setIsAddModalVisible,
+    isScannerVisible,
+    setIsScannerVisible,
+    handleManualAdd,
+    handleScannerTrigger,
+    handleAIResultDetected,
+  };
+}
+
+// Extracted Components
+interface ThemeColors {
+  primary: string;
+  surface: string;
+  border: string;
+  textSecondary: string;
+  text: string;
+  success: string;
+  error: string;
+  background: string;
+}
+
+interface ThemeShadows {
+  medium: object;
+  large: object;
+}
+
+const PantryHeader = React.memo<{
+  colors: ThemeColors;
+  shadows: ThemeShadows;
+  searchQuery: string;
+  setSearchQuery: (query: string) => void;
+  itemCount: number;
+}>(({ colors, shadows, searchQuery, setSearchQuery, itemCount }) => (
+  <View style={[styles.headerContainer, shadows.medium]}>
+    <LinearGradient colors={[colors.primary, '#4338CA']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.headerPad}>
+      <View style={styles.headerTopRow}>
+        <View>
+          <Text style={styles.headerLabel}>SECURE VAULT ACCESS</Text>
+          <Text style={styles.headerTitleMain}>Inventory</Text>
+        </View>
+        <View style={styles.badgeShell}>
+          <Text style={styles.badgeText}>{itemCount}</Text>
+        </View>
+      </View>
+      <BlurView intensity={30} style={styles.searchBarBox}>
+        <Feather name="search" size={18} color="white" style={{ marginLeft: 15 }} />
+        <TextInput
+          placeholder="Query stock records..."
+          placeholderTextColor="rgba(255,255,255,0.5)"
+          style={styles.searchInputCore}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+      </BlurView>
+    </LinearGradient>
+  </View>
+));
+PantryHeader.displayName = 'PantryHeader';
+
+const CategoryFilter = React.memo<{
+  colors: ThemeColors;
+  activeCategory: string;
+  setActiveCategory: (category: string) => void;
+}>(({ colors, activeCategory, setActiveCategory }) => (
+  <View style={styles.filterOuter}>
+    <FlatList
+      horizontal
+      data={CATEGORIES}
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ paddingHorizontal: 24 }}
+      renderItem={({ item }) => (
         <TouchableOpacity
-          onLongPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
-            Alert.alert(
-              'Remove Item',
-              `Are you sure you want to delete ${item.name}?`,
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  onPress: () => deleteMutation.mutate(item.id),
-                  style: 'destructive',
-                },
-              ]
-            );
-          }}
+          onPress={() => setActiveCategory(item)}
           style={[
-            styles.card,
+            styles.chip,
             { backgroundColor: colors.surface, borderColor: colors.border },
+            activeCategory === item && { backgroundColor: colors.primary, borderColor: colors.primary },
           ]}
         >
-          <View style={styles.cardHeader}>
-            <Text
-              style={[styles.itemName, { color: colors.text }]}
-              numberOfLines={1}
-            >
-              {item.name}
-            </Text>
-            <View
-              style={[styles.statusDot, { backgroundColor: urgency.color }]}
-            />
-          </View>
-          <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
-            {item.quantity} {item.unit} •{' '}
-            {item.storage_locations?.name || 'Kitchen'}
-          </Text>
-          <Text style={[styles.urgencyText, { color: urgency.color }]}>
-            {urgency.label.toUpperCase()}
+          <Text style={[styles.chipLabel, { color: activeCategory === item ? '#FFF' : colors.textSecondary }]}>
+            {item}
           </Text>
         </TouchableOpacity>
-      </Animated.View>
-    );
-  };
+      )}
+      keyExtractor={(item) => item}
+    />
+  </View>
+));
+CategoryFilter.displayName = 'CategoryFilter';
+
+const InventoryCard = React.memo<{
+  item: PantryItemWithStorage;
+  index: number;
+  cardWidth: number;
+  colors: ThemeColors;
+}>(({ item, index, cardWidth, colors }) => {
+  const getUrgency = useCallback((item: PantryItemWithStorage) => {
+    if (!item.expiry_date) return { label: 'Fresh', color: colors.success };
+    const days = Math.ceil((new Date(item.expiry_date).getTime() - Date.now()) / 86400000);
+    if (days < 0 || item.status === 'expired') return { label: 'Expired', color: colors.error };
+    return { label: 'Stable', color: colors.primary };
+  }, [colors]);
+
+  const status = getUrgency(item);
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['top']}
-    >
-      <StatusBar barStyle="light-content" />
-
-      {/* MODULE 7: DYNAMIC HEADER ENGINE */}
-      <LinearGradient
-        colors={[colors.primary, '#4338CA']}
-        style={styles.header}
+    <Animated.View entering={FadeInDown.delay(index * 40)} exiting={FadeOut}>
+      <TouchableOpacity
+        activeOpacity={0.9}
+        style={[styles.inventoryCard, { backgroundColor: colors.surface, borderColor: colors.border, width: cardWidth }]}
       >
-        <View style={styles.headerTop}>
-          <Text style={styles.headerTitle}>Inventory</Text>
-          <View style={styles.badge}>
-            <Text style={styles.badgeText}>{filteredItems.length} Items</Text>
-          </View>
+        <View style={styles.cardHeader}>
+          <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+          <Text style={[styles.statusLabel, { color: status.color }]}>{status.label.toUpperCase()}</Text>
         </View>
-        <View style={styles.searchBar}>
-          <Feather name="search" size={18} color={colors.textSecondary} />
-          <TextInput
-            placeholder="Search pantry..."
-            placeholderTextColor={colors.textSecondary}
-            style={[styles.searchInput, { color: '#0F172A' }]}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
+        <Text style={[styles.itemNameText, { color: colors.text }]} numberOfLines={2}>
+          {item.name}
+        </Text>
+        <View style={styles.cardFooter}>
+          <Text style={[styles.itemMeta, { color: colors.textSecondary }]}>
+            {item.quantity} {item.unit}
+          </Text>
+          <Feather name="chevron-right" size={14} color={colors.border} />
         </View>
-      </LinearGradient>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+InventoryCard.displayName = 'InventoryCard';
 
-      {/* MODULE 8: INTERACTIVE CATEGORY BAR */}
-      <View style={styles.filterContainer}>
-        <FlatList
-          horizontal
-          data={CATEGORIES}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveCategory(item);
-              }}
-              style={[
-                styles.chip,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                activeCategory === item && {
-                  backgroundColor: colors.primary,
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  {
-                    color:
-                      activeCategory === item ? '#FFF' : colors.textSecondary,
-                  },
-                ]}
-              >
-                {item}
-              </Text>
-            </TouchableOpacity>
-          )}
-          contentContainerStyle={styles.filterContent}
-        />
+const FABGroup = React.memo<{
+  colors: ThemeColors;
+  shadows: ThemeShadows;
+  onScannerPress: () => void;
+  onManualAddPress: () => void;
+}>(({ colors, shadows, onScannerPress, onManualAddPress }) => (
+  <View style={styles.fabAnchor}>
+    <TouchableOpacity
+      style={[styles.fabAlt, { backgroundColor: colors.surface }, shadows.large]}
+      onPress={onScannerPress}
+    >
+      <MaterialCommunityIcons name="camera-iris" size={32} color={colors.primary} />
+    </TouchableOpacity>
+    <TouchableOpacity
+      style={[styles.fabMain, { backgroundColor: colors.primary }, shadows.large]}
+      onPress={onManualAddPress}
+    >
+      <Feather name="plus" size={36} color="#FFF" />
+    </TouchableOpacity>
+  </View>
+));
+FABGroup.displayName = 'FABGroup';
+
+const LoadingState = React.memo<{ colors: ThemeColors; isProcessingAI: boolean }>(({ colors, isProcessingAI }) => (
+  <View style={styles.center}>
+    <ActivityIndicator size="large" color={colors.primary} />
+    {isProcessingAI && (
+      <Text style={[styles.aiLoadText, { color: colors.text }]}>GEMINI IS ANALYZING VISUALS...</Text>
+    )}
+  </View>
+));
+LoadingState.displayName = 'LoadingState';
+
+const EmptyState = React.memo<{ colors: ThemeColors }>(({ colors }) => (
+  <Animated.View entering={FadeInUp} style={styles.emptyWrap}>
+    <MaterialCommunityIcons name="package-variant" size={100} color={colors.border} />
+    <Text style={[styles.emptyTitle, { color: colors.text }]}>No Records Found</Text>
+  </Animated.View>
+));
+EmptyState.displayName = 'EmptyState';
+
+// Main Component
+export default function PantryScreen() {
+  const { colors, shadows } = useTheme();
+  const { household, user, profile, refreshMetadata, isLoading: authLoading } = useAuth();
+  const { width: windowWidth } = useWindowDimensions();
+
+  // Layout calculations
+  const { columns, cardWidth } = useMemo(() => {
+    let cols = 2;
+    if (Platform.OS === 'web') {
+      if (windowWidth > 1200) cols = 4;
+      else if (windowWidth > 800) cols = 3;
+    }
+    const totalPadding = 48;
+    const gap = SPACING * (cols - 1);
+    const availableWidth = Math.min(windowWidth, 1400);
+    return {
+      columns: cols,
+      cardWidth: (availableWidth - totalPadding - gap) / cols,
+    };
+  }, [windowWidth]);
+
+  // Data fetching
+  const { data: items = [], isLoading: isInventoryLoading, refetch, isRefetching, error: fetchError } = usePantryItems(
+    !!household?.id && !!profile,
+    household?.id
+  ) as { data: PantryItemWithStorage[]; isLoading: boolean; refetch: () => void; isRefetching: boolean; error: Error | null };
+
+  // Filtering
+  const { searchQuery, setSearchQuery, activeCategory, setActiveCategory, filteredItems } = useInventoryFilters(items);
+
+  // AI Scanner
+  const {
+    isProcessingAI,
+    scannedItemData,
+    isAddModalVisible,
+    setIsAddModalVisible,
+    isScannerVisible,
+    setIsScannerVisible,
+    handleManualAdd,
+    handleScannerTrigger,
+    handleAIResultDetected,
+  } = useAIScanner(household?.id, user?.id);
+
+  // Auth error state
+  if (!authLoading && !profile) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <TouchableOpacity style={styles.recoveryBtn} onPress={() => refreshMetadata()}>
+          <Text style={{ color: colors.primary, fontWeight: '900' }}>RE-SYNC IDENTITY</Text>
+        </TouchableOpacity>
       </View>
+    );
+  }
 
-      {isLoading ? (
-        <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
+  // Data error state
+  if (fetchError) {
+    return (
+      <View style={[styles.center, { backgroundColor: colors.background }]}>
+        <Text style={[styles.emptyTitle, { color: colors.error }]}>Failed to Load Inventory</Text>
+        <TouchableOpacity style={styles.recoveryBtn} onPress={() => refetch()}>
+          <Text style={{ color: colors.primary, fontWeight: '900' }}>RETRY</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      <StatusBar style="light" />
+
+      <PantryHeader
+        colors={colors}
+        shadows={shadows}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        itemCount={filteredItems.length}
+      />
+
+      <CategoryFilter colors={colors} activeCategory={activeCategory} setActiveCategory={setActiveCategory} />
+
+      {isInventoryLoading || isProcessingAI ? (
+        <LoadingState colors={colors} isProcessingAI={isProcessingAI} />
       ) : (
         <FlatList
+          key={columns}
           data={filteredItems}
-          numColumns={2}
+          numColumns={columns}
           keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          columnWrapperStyle={styles.columnWrapper}
-          contentContainerStyle={styles.listPadding}
-          refreshControl={
-            <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={refetch}
-              tintColor={colors.primary}
-            />
-          }
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Feather name="package" size={48} color={colors.border} />
-              <Text
-                style={{
-                  color: colors.textSecondary,
-                  marginTop: 12,
-                  fontWeight: '600',
-                }}
-              >
-                No items found
-              </Text>
-            </View>
-          }
+          renderItem={({ item, index }) => (
+            <InventoryCard item={item} index={index} cardWidth={cardWidth} colors={colors} />
+          )}
+          columnWrapperStyle={styles.gridRow}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
+          ListEmptyComponent={<EmptyState colors={colors} />}
         />
       )}
 
-      {/* MODULE 9: FLOATING ACTION ORCHESTRATOR (FAB) */}
-      <View style={styles.fabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.fab,
-            { backgroundColor: colors.surface, marginBottom: 16 },
-          ]}
-          onPress={() => setIsScannerVisible(true)}
-        >
-          <MaterialCommunityIcons
-            name="camera-iris"
-            size={28}
-            color={colors.primary}
-          />
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: colors.primary }]}
-          onPress={() => {
-            setScannedItemData(null);
-            setIsAddModalVisible(true);
-          }}
-        >
-          <Feather name="plus" size={30} color="#FFF" />
-        </TouchableOpacity>
-      </View>
+      <FABGroup
+        colors={colors}
+        shadows={shadows}
+        onScannerPress={handleScannerTrigger}
+        onManualAddPress={handleManualAdd}
+      />
 
       <AddItemModal
         isVisible={isAddModalVisible}
         onClose={() => setIsAddModalVisible(false)}
-        initialData={scannedItemData}
+        initialData={scannedItemData as ThemeColors}
       />
-      <AIFoodScanner
-        isVisible={isScannerVisible}
-        onClose={() => setIsScannerVisible(false)}
-        onItemsDetected={(d) => {
-          setScannedItemData(d[0]);
-          setIsScannerVisible(false);
-          setIsAddModalVisible(true);
-        }}
-      />
+
+      {isScannerVisible && (
+        <AIFoodScanner onClose={() => setIsScannerVisible(false)} onItemsDetected={handleAIResultDetected} />
+      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    padding: 24,
-    borderBottomLeftRadius: 32,
-    borderBottomRightRadius: 32,
-    paddingBottom: 32,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '900',
-    color: '#FFF',
-    letterSpacing: -0.5,
-  },
-  badge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-  },
-  badgeText: { color: '#FFF', fontWeight: '800', fontSize: 12 },
-  searchBar: {
-    flexDirection: 'row',
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    paddingHorizontal: 16,
-    height: 52,
-    alignItems: 'center',
-  },
-  searchInput: { flex: 1, marginLeft: 10, fontSize: 16, fontWeight: '600' },
-  filterContainer: { marginVertical: 12 },
-  filterContent: { paddingHorizontal: 20 },
-  chip: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 14,
-    marginRight: 8,
-    borderWidth: 1,
-  },
-  chipText: { fontWeight: '700', fontSize: 13 },
-  listPadding: { padding: SPACING, paddingBottom: 160 },
-  columnWrapper: { justifyContent: 'space-between' },
-  card: {
-    width: COLUMN_WIDTH,
-    padding: 16,
-    borderRadius: 24,
-    borderWidth: 1,
-    marginBottom: 16,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  itemName: { fontSize: 16, fontWeight: '800', flex: 1, marginRight: 8 },
-  statusDot: { width: 8, height: 8, borderRadius: 4 },
-  itemMeta: { fontSize: 12, fontWeight: '600', marginTop: 4 },
-  urgencyText: {
-    fontSize: 10,
-    fontWeight: '900',
-    marginTop: 12,
-    letterSpacing: 1,
-  },
-  fabContainer: { position: 'absolute', bottom: 100, right: 24 },
-  fab: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 5 },
-  },
-  loaderContainer: { marginTop: 100, alignItems: 'center' },
-  emptyContainer: { alignItems: 'center', marginTop: 100 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  headerContainer: { borderBottomLeftRadius: 44, borderBottomRightRadius: 44, overflow: 'hidden', backgroundColor: 'black' },
+  headerPad: { padding: 24, paddingBottom: 40, paddingTop: Platform.OS === 'ios' ? 10 : 30 },
+  headerTopRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 28 },
+  headerLabel: { color: 'rgba(255,255,255,0.6)', fontSize: 10, fontWeight: '900', letterSpacing: 2 },
+  headerTitleMain: { fontSize: 42, fontWeight: '900', color: 'white', letterSpacing: -1.5, marginTop: 4 },
+  badgeShell: { width: 54, height: 54, borderRadius: 20, backgroundColor: 'rgba(255,255,255,0.15)', justifyContent: 'center', alignItems: 'center' },
+  badgeText: { color: 'white', fontWeight: '900', fontSize: 18 },
+  searchBarBox: { height: 64, borderRadius: 24, flexDirection: 'row', alignItems: 'center', overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.1)' },
+  searchInputCore: { flex: 1, marginLeft: 15, fontSize: 17, fontWeight: '700', color: 'white' },
+  filterOuter: { marginVertical: 20 },
+  chip: { paddingHorizontal: 24, paddingVertical: 14, borderRadius: 20, marginRight: 12, borderWidth: 1 },
+  chipLabel: { fontWeight: '800', fontSize: 14 },
+  listContainer: { padding: 24, paddingBottom: 220 },
+  gridRow: { justifyContent: 'space-between' },
+  inventoryCard: { padding: 20, borderRadius: 36, borderWidth: 1, marginBottom: SPACING },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  statusDot: { width: 10, height: 10, borderRadius: 5 },
+  statusLabel: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
+  itemNameText: { fontSize: 18, fontWeight: '900', lineHeight: 22, height: 44 },
+  cardFooter: { marginTop: 18, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  itemMeta: { fontSize: 13, fontWeight: '700' },
+  fabAnchor: { position: 'absolute', bottom: 120, right: 30, alignItems: 'center' },
+  fabMain: { width: 80, height: 80, borderRadius: 30, justifyContent: 'center', alignItems: 'center' },
+  fabAlt: { width: 64, height: 64, borderRadius: 24, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  emptyWrap: { flex: 1, alignItems: 'center', marginTop: 80, paddingHorizontal: 50 },
+  emptyTitle: { fontSize: 28, fontWeight: '900', marginTop: 24 },
+  aiLoadText: { marginTop: 24, fontWeight: '900', letterSpacing: 1, fontSize: 14 },
+  retryBtn: { marginTop: 20 },
+  recoveryBtn: { marginTop: 32, paddingHorizontal: 40, paddingVertical: 20, borderRadius: 20, backgroundColor: '#4F46E5' }
 });

@@ -30,9 +30,8 @@ export const validatePantryItem = (item: Partial<PantryInsert>): string[] => {
     errors.push('Quantity must be a positive number.');
   }
 
-  // 3. Enum Validation (Ensures alignment with SQL storage_type)
-  const validLocations = ['pantry', 'fridge', 'freezer', 'other'];
-  if (!item.location || !validLocations.includes(item.location)) {
+  // 3. Storage Location Validation (Ensures storage_id is provided for foreign key)
+  if (!item.storage_id) {
     errors.push('Please select a valid storage location.');
   }
 

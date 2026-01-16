@@ -1,5 +1,4 @@
 {
-  // Custom words for cSpell spell checker to avoid false positives for project-specific terms
   "cSpell.words": [
     "Bento",
     "glassmorphism",
@@ -7,13 +6,27 @@
     "Nativewind",
     "pantrypal",
     "supabase",
-    "Tanstack"
+    "Tanstack",
+    "plpgsql",
+    "typname",
+    "ossp",
+    "Postgrest"
   ],
-
-  "deno.enable": true,
+  // CRITICAL: Only enable Deno for the functions directory
+  "deno.enable": false,
+  "deno.enablePaths": ["supabase/functions"],
   "deno.lint": true,
   "deno.unstable": [],
   "deno.importMap": "./supabase/functions/import_map.json",
-  "deno.enablePaths": ["supabase/functions"],
-  "typescript.preferences.importModuleSpecifier": "non-relative"
+
+  // React Native / TypeScript Optimizations
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.preferences.importModuleSpecifier": "non-relative",
+  "editor.formatOnSave": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  }
 }

@@ -37,19 +37,15 @@ import Animated, {
   FadeInUp,
   FadeInDown,
   Layout,
-  SlideInRight,
 } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import QRCode from 'react-native-qrcode-svg';
-import { LinearGradient } from 'expo-linear-gradient';
 
 // Internal System Contexts & Services
 import { useTheme } from '../../contexts/ThemeContext';
 import { useAuth } from '../../contexts/AuthContext';
 import { BiometricService } from '../../services/BiometricService';
 import { supabase } from '../../services/supabase';
-
-const { width } = Dimensions.get('window');
 
 export default function SettingsScreen() {
   // --- DESIGN SYSTEM CONSUMPTION ---
@@ -114,14 +110,14 @@ export default function SettingsScreen() {
       try {
         const fileExt = asset.uri.split('.').pop();
         const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-        const filePath = `avatars/${fileName}`;
+        const filePath = fileName;
 
         // ENTERPRISE FIX: Blob conversion for reliable mobile uploads
         const response = await fetch(asset.uri);
         const blob = await response.blob();
 
         const { error: uploadError } = await supabase.storage
-          .from('pantry-media')
+          .from('avatars')
           .upload(filePath, blob, {
             contentType: `image/${fileExt}`,
             upsert: true,
@@ -131,10 +127,10 @@ export default function SettingsScreen() {
 
         const {
           data: { publicUrl },
-        } = supabase.storage.from('pantry-media').getPublicUrl(filePath);
+        } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
         // Atomic update to the profile record
-        const { error: updateError } = await supabase
+        const { error: updateError } = await (supabase as any)
           .from('profiles')
           .update({ avatar_url: publicUrl })
           .eq('id', user.id);
@@ -143,9 +139,9 @@ export default function SettingsScreen() {
 
         await refreshMetadata();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (err: any) {
+      } catch (err: unknown) {
         setLocalAvatar(null); // Rollback on failure
-        Alert.alert('Cloud Sync Failure', err.message);
+        Alert.alert('Cloud Sync Failure', err instanceof Error ? err.message : 'Unknown error');
       } finally {
         setIsUploading(false);
       }
@@ -165,8 +161,8 @@ export default function SettingsScreen() {
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('profiles')
+      const { error } = await (supabase as any)
+        .from('profiles') // Explicitly specify the table
         .update({ full_name: newName.trim() })
         .eq('id', user.id);
 
@@ -175,8 +171,8 @@ export default function SettingsScreen() {
       await refreshMetadata();
       setIsEditing(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: any) {
-      Alert.alert('Update Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Update Error', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -218,8 +214,8 @@ export default function SettingsScreen() {
       );
       setIsChangingPassword(false);
       setNewPassword('');
-    } catch (err: any) {
-      Alert.alert('Auth Error', err.message);
+    } catch (err: unknown) {
+      Alert.alert('Auth Error', err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -252,19 +248,19 @@ export default function SettingsScreen() {
    * MODULE 7: STYLING ORCHESTRATION
    * Logic: Memoized styles ensure 60FPS transitions during theme swaps.
    */
-  const cardStyle = useMemo(
-    () => [
-      styles.glassCard,
-      {
-        backgroundColor: isDark
-          ? 'rgba(30, 41, 59, 0.7)'
-          : 'rgba(255, 255, 255, 0.85)',
-        borderColor: colors.border,
-      },
-      !isDark && shadows.medium,
-    ],
-    [colors.border, isDark, shadows.medium]
-  );
+const cardStyle = useMemo(
+  () => [
+    styles.glassCard,
+    {
+      backgroundColor: isDark
+        ? 'rgba(30, 41, 59, 0.7)'
+        : 'rgba(255, 255, 255, 0.85)',
+      borderColor: colors.border,
+    },
+    !isDark && shadows.medium, // This will now use the high-contrast light mode shadow
+  ],
+  [colors.border, isDark, shadows.medium]
+);
 
   // QR Logic: Strictly typed non-nullable link
   const inviteLink = useMemo(
@@ -298,8 +294,7 @@ export default function SettingsScreen() {
                   uri:
                     localAvatar ||
                     profile?.avatar_url ||
-                    `https://ui-avatars.com/api/?name=${
-                      profile?.full_name || 'U'
+                    `https://ui-avatars.com/api/?name=${profile?.full_name || 'U'
                     }&background=6366F1&color=fff`,
                 }}
                 style={[styles.avatar, isUploading && { opacity: 0.5 }]}

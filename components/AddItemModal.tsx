@@ -195,14 +195,25 @@ export default function AddItemModal({
 }
 
 const styles = StyleSheet.create({
-  overlay: { flex: 1, justifyContent: 'flex-end' },
-  container: { width: '100%' },
+  overlay: { 
+    flex: 1, 
+    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-end',
+    alignItems: Platform.OS === 'web' ? 'center' : 'stretch',
+    padding: Platform.OS === 'web' ? 20 : 0
+  },
+  container: { 
+    width: '100%',
+    maxWidth: Platform.OS === 'web' ? 600 : '100%',
+  },
   content: {
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
+    borderBottomLeftRadius: Platform.OS === 'web' ? 40 : 0,
+    borderBottomRightRadius: Platform.OS === 'web' ? 40 : 0,
     borderWidth: 1,
     padding: 32,
     maxHeight: '90%',
+    width: '100%',
   },
   header: {
     flexDirection: 'row',

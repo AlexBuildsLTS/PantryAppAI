@@ -11,11 +11,13 @@
       "resizeMode": "contain",
       "backgroundColor": "#0A0A0A"
     },
+    "plugins": ["expo-camera"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.north.pantrypal",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "Pantry Pal uses FaceID to secure your household data."
+        "NSFaceIDUsageDescription": "Pantry Pal uses FaceID to secure your household data.",
+        "NSCameraUsageDescription": "This app uses the camera to scan food items."
       }
     },
     "android": {
@@ -23,7 +25,8 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#0A0A0A"
       },
-      "package": "com.yourname.pantrypal"
+      "package": "com.yourname.pantrypal",
+      "permissions": ["CAMERA"]
     }
   }
 }

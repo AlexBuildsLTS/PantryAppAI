@@ -1,61 +1,35 @@
 /**
- * @file _layout.tsx
- * @description Master Tab Navigation & Authentication Orchestrator.
- * * AAA+ DESIGN PATTERNS:
- * 1. Hard Authentication Guard: Enforces session-only access.
- * 2. Hydration Management: Prevents "Ghost Profiles" via strict loading states.
- * 3. Haptic Integration: Native tactile feedback on tab transitions.
- * 4. Glassmorphic UI: High-fidelity BlurView orchestration for iOS.
+ * @file app/(tabs)/_layout.tsx
+ * -----------------------------------------------------------------------------------
+ * FIXES:
+ *  LAYOUT STABILITY: Removes absolute positioning on Web to fix "zoom-out" bugs.
+ *  HAPTIC ENGINE: Web-safe vibration handling.
+ *  GLASSMORPHISM: Environment-aware blur intensity for iOS vs Android/Web.
+ * -----------------------------------------------------------------------------------
  */
 
-import React, { useEffect } from 'react';
-import { Tabs, useRouter } from 'expo-router';
+import React, { useCallback } from 'react';
+import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
-import { Platform, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Platform, StyleSheet } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 
-// Internal System Contexts
+// Internal System Infrastructure
 import { useTheme } from '../../contexts/ThemeContext';
-import { useAuth } from '../../contexts/AuthContext';
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
-  const { user, isLoading } = useAuth();
-  const router = useRouter();
 
   /**
-   * MODULE 1: AUTHENTICATION ENFORCEMENT
-   * Description: Redirects unauthenticated users to the login flow immediately
-   * upon session expiration or invalid state.
+   * MODULE: HAPTIC FEEDBACK
+   * Description: Triggers selection feedback for Native Mobile; silent for Web.
    */
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace('/sign-in');
+  const handleTabPress = useCallback(() => {
+    if (Platform.OS !== 'web') {
+      Haptics.selectionAsync().catch(() => null);
     }
-  }, [user, isLoading, router]);
-
-  /**
-   * MODULE 2: HAPTIC FEEDBACK ORCHESTRATOR
-   * Description: Triggers selection-style vibration to match native iOS/Android
-   * system behavior for premium user experience.
-   */
-  const handleTabPress = () => {
-    Haptics.selectionAsync();
-  };
-
-  /**
-   * MODULE 3: HYDRATION GUARD (SKELETON)
-   * Description: Blocks the rendering of the tab bar and sub-screens until
-   * Supabase Auth has finished profile lookup to prevent "Chef Member" UI ghosting.
-   */
-  if (isLoading) {
-    return (
-      <View style={[styles.loader, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  }, []);
 
   return (
     <Tabs
@@ -64,27 +38,31 @@ export default function TabLayout() {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,
 
-        // MODULE 4: PREMIUM NAVIGATION STYLING
-        // Description: Implements absolute positioning for the tab bar to
-        // enable background transparency and blurred layering.
+        /**
+         * MODULE: DYNAMIC TAB STYLING
+         * Fix: Uses 'position: absolute' ONLY on native for blur effects.
+         * Web uses standard flow to prevent the layout from stretching (Zoom bug).
+         */
         tabBarStyle: {
-          position: 'absolute',
+          position: Platform.OS === 'web' ? 'relative' : 'absolute',
           borderTopWidth: 0,
           elevation: 0,
-          height: Platform.OS === 'ios' ? 88 : 70,
-          backgroundColor:
-            Platform.OS === 'ios' ? 'transparent' : colors.surface,
-          borderTopColor: colors.border,
-          paddingBottom: Platform.OS === 'ios' ? 30 : 10,
+          height: Platform.OS === 'ios' ? 88 : 72,
+          backgroundColor: Platform.OS === 'ios' ? 'transparent' : colors.surface,
+          // Fixed: Use boxShadow compatible styling
+          shadowOpacity: 0,
+          paddingBottom: Platform.OS === 'ios' ? 32 : 12,
+          paddingTop: 12,
+          zIndex: 1000, // Ensure TabBar stays above content but below Modals
         },
 
-        // MODULE 5: GLASSMORPHIC EFFECT ENGINE
-        // Description: Only active on iOS. Provides an intensity-controlled
-        // blur that adapts to the current system theme (Dark/Light).
+        /**
+         * MODULE: GLASSMORPHIC BACKGROUND
+         */
         tabBarBackground: () =>
           Platform.OS === 'ios' ? (
             <BlurView
-              intensity={isDark ? 80 : 40}
+              intensity={isDark ? 80 : 60}
               tint={isDark ? 'dark' : 'light'}
               style={StyleSheet.absoluteFill}
             />
@@ -92,79 +70,98 @@ export default function TabLayout() {
 
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '900',
+          fontWeight: '800',
           letterSpacing: 0.5,
           marginTop: -4,
         },
       }}
     >
-      {/* SECTION 1: CORE INVENTORY (PANTRY) */}
+      {/* SECTION 1: INVENTORY */}
       <Tabs.Screen
         name="index"
         options={{
-          title: 'PANTRY',
-          tabBarIcon: ({ color }) => (
-            <Feather name="package" size={22} color={color} />
+          title: 'Inventory',
+          tabBarLabel: 'PANTRY',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="package" size={size} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* SECTION 2: SUPPLY CHAIN LOGISTICS (SHOPPING) */}
+      {/* SECTION 2: SUPPLY CHAIN */}
       <Tabs.Screen
         name="shopping"
         options={{
-          title: 'SHOPPING',
-          tabBarIcon: ({ color }) => (
-            <Feather name="shopping-cart" size={22} color={color} />
+          title: 'Supply Chain',
+          tabBarLabel: 'SHOPPING',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="shopping-cart" size={size} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* SECTION 3: AI INTELLIGENCE (CHEF AI) */}
+      {/* SECTION 3: AI KITCHEN */}
       <Tabs.Screen
         name="recipes"
         options={{
-          title: 'CHEF AI',
+          title: 'Chef AI',
+          tabBarLabel: 'CHEF AI',
           tabBarIcon: ({ color }) => (
-            <MaterialCommunityIcons name="chef-hat" size={24} color={color} />
+            <MaterialCommunityIcons name="chef-hat" size={26} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* SECTION 4: SUSTAINABILITY METRICS (IMPACT) */}
+      {/* SECTION 4: IMPACT ANALYTICS */}
       <Tabs.Screen
         name="analytics"
         options={{
-          title: 'IMPACT',
-          tabBarIcon: ({ color }) => (
-            <Feather name="bar-chart-2" size={22} color={color} />
+          title: 'Impact',
+          tabBarLabel: 'IMPACT',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="pie-chart" size={size} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* SECTION 5: REAL-TIME NOTIFICATIONS (ALERTS) */}
+      {/* SECTION 5: COMMAND CENTER */}
+      <Tabs.Screen
+        name="dashboard"
+        options={{
+          title: 'Analytics',
+          tabBarLabel: 'DASHBOARD',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="database" size={size} color={color} />
+          ),
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
+
+      {/* SECTION 6: ALERTS */}
       <Tabs.Screen
         name="notifications"
         options={{
-          title: 'ALERTS',
-          tabBarIcon: ({ color }) => (
-            <Feather name="bell" size={22} color={color} />
+          title: 'Alerts',
+          tabBarLabel: 'ALERTS',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="bell" size={size} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
       />
 
-      {/* SECTION 6: COMMAND CENTER (ACCOUNT) */}
+      {/* SECTION 7: IDENTITY HUB */}
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'ACCOUNT',
-          tabBarIcon: ({ color }) => (
-            <Feather name="settings" size={22} color={color} />
+          title: 'Account',
+          tabBarLabel: 'ACCOUNT',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="user" size={size} color={color} />
           ),
         }}
         listeners={{ tabPress: handleTabPress }}
@@ -172,14 +169,3 @@ export default function TabLayout() {
     </Tabs>
   );
 }
-
-/**
- * MODULE 7: INTERNAL COMPONENT STYLES
- */
-const styles = StyleSheet.create({
-  loader: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-});
