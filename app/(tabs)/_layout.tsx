@@ -10,6 +10,7 @@
 
 import React, { useCallback } from 'react';
 import { Tabs } from 'expo-router';
+import { useAuth } from '../../contexts/AuthContext';
 import { BlurView } from 'expo-blur';
 import { Platform, StyleSheet } from 'react-native';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -20,6 +21,7 @@ import { useTheme } from '../../contexts/ThemeContext';
 
 export default function TabLayout() {
   const { colors, isDark } = useTheme();
+  const { profile } = useAuth();
 
   /**
    * MODULE: HAPTIC FEEDBACK
@@ -129,6 +131,32 @@ export default function TabLayout() {
       />
 
       {/* SECTION 5: COMMAND CENTER */}
+      {/* ADMIN TAB: Only visible to admin */}
+      {profile?.role === 'admin' && (
+        <Tabs.Screen
+          name="admin"
+          options={{
+            title: 'Admin',
+            tabBarLabel: 'ADMIN',
+            tabBarIcon: ({ color, size }) => (
+              <Feather name="shield" color={color} size={size} />
+            ),
+          }}
+          listeners={{ tabPress: handleTabPress }}
+        />
+      )}
+      {/* SUPPORT TAB: Always visible */}
+      <Tabs.Screen
+        name="support"
+        options={{
+          title: 'Support',
+          tabBarLabel: 'SUPPORT',
+          tabBarIcon: ({ color, size }) => (
+            <Feather name="help-circle" color={color} size={size} />
+          ),
+        }}
+        listeners={{ tabPress: handleTabPress }}
+      />
       <Tabs.Screen
         name="dashboard"
         options={{

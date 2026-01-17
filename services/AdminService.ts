@@ -4,7 +4,8 @@
  * @description Enterprise Admin Orchestrator. Matches Database Schema v8.0.
  */
 
-import { supabase } from './supabase';
+
+import { supabase } from '../lib/supabase';
 import { Database } from '../types/database.types';
 
 // Explicitly pull types from the Database interface to ensure alignment

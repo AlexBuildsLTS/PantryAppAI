@@ -84,6 +84,12 @@ const EfficiencyRing = ({ percentage, color }: { percentage: number; color: stri
   return (
     <View style={styles.ringContainer}>
       <Svg width={180} height={180} viewBox="0 0 180 180">
+        <Defs>
+          <LinearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <Stop offset="0%" stopColor={color} stopOpacity="0.6"/>
+            <Stop offset="100%" stopColor={color} stopOpacity="1"/>
+          </LinearGradient>
+        </Defs>
         {/* Remove deprecated transform-origin, rely on origin prop for react-native-svg */}
         <G rotation="-90" origin="90, 90">
           <Circle
@@ -98,7 +104,7 @@ const EfficiencyRing = ({ percentage, color }: { percentage: number; color: stri
             cx="90"
             cy="90"
             r={radius}
-            stroke={color}
+            stroke="url(#ringGrad)"
             strokeWidth={strokeWidth}
             strokeDasharray={`${circumference} ${circumference}`}
             animatedProps={animatedProps}
@@ -121,7 +127,7 @@ const BentoNode = ({ title, value, sub, icon, color, delay }: any) => {
   return (
     <Animated.View
       entering={FadeInDown.delay(delay).springify()}
-      style={[styles.bentoNode, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      style={[styles.bentoNode, { backgroundColor: colors.surface + 'CC', borderColor: colors.border }]}
     >
       <View style={[styles.nodeIcon, { backgroundColor: color + '15' }]}>
         <Feather name={icon} size={18} color={color} />
@@ -212,7 +218,7 @@ export default function AnalyticsScreen() {
         {/* HERO SECTION: THE NEURAL RING */}
         <Animated.View
           entering={FadeInDown.delay(100)}
-          style={[styles.heroCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          style={[styles.heroCard, { backgroundColor: colors.surface + 'CC', borderColor: colors.border }]}
         >
           <EfficiencyRing percentage={utilizationRate} color={colors.primary} />
           <View style={styles.heroContent}>
@@ -275,7 +281,7 @@ export default function AnalyticsScreen() {
             <Animated.View
               key={item.name}
               entering={FadeInDown.delay(500 + idx * 100)}
-              style={[styles.heatNode, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              style={[styles.heatNode, { backgroundColor: colors.surface + 'CC', borderColor: colors.border }]}
             >
               <MaterialCommunityIcons name={item.icon} size={28} color={item.color} />
               <Text style={[styles.heatName, { color: colors.textSecondary }]}>{item.name}</Text>
@@ -290,7 +296,7 @@ export default function AnalyticsScreen() {
           entering={FadeInUp.delay(800)}
           style={[styles.savingsCard, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}
         >
-          <BlurView intensity={20} tint={isDark ? 'dark' : 'light'} style={styles.blurPad}>
+          <BlurView intensity={25} tint={isDark ? 'dark' : 'light'} style={styles.blurPad}>
             <View style={styles.savingsHeader}>
               <Feather name="dollar-sign" size={20} color={colors.primary} />
               <Text style={[styles.savingsTitle, { color: colors.primary }]}>FINANCIAL RECOVERY</Text>
@@ -318,7 +324,7 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: 14, fontWeight: '600', marginTop: 4, opacity: 0.7, lineHeight: 20 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   loadingText: { marginTop: 16, fontWeight: '900', fontSize: 11, letterSpacing: 2 },
-  heroCard: { padding: 24, borderRadius: 44, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 20 },
+  heroCard: { padding: 24, borderRadius: 44, borderWidth: 1, flexDirection: 'row', alignItems: 'center', gap: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity:0.15, shadowRadius:12, elevation:5 },
   ringContainer: { width: 120, height: 120, justifyContent: 'center', alignItems: 'center' },
   ringOverlay: { position: 'absolute', alignItems: 'center' },
   ringValue: { fontSize: 28, fontWeight: '900' },
@@ -329,24 +335,24 @@ const styles = StyleSheet.create({
   heroBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 12 },
   badgeText: { fontSize: 10, fontWeight: '900', letterSpacing: 1 },
   gridRow: { flexDirection: 'row', gap: 16, marginBottom: 32 },
-  bentoNode: { flex: 1, padding: 20, borderRadius: 32, borderWidth: 1 },
+  bentoNode: { flex: 1, padding: 20, borderRadius: 32, borderWidth: 1, shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity:0.1, shadowRadius:6, elevation:3 },
   nodeIcon: { width: 36, height: 36, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   nodeTitle: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5, marginBottom: 4 },
   nodeValue: { fontSize: 24, fontWeight: '900' },
   nodeSub: { fontSize: 9, fontWeight: '700', marginTop: 4 },
   sectionHeader: { fontSize: 22, fontWeight: '900', marginBottom: 16, letterSpacing: -0.5 },
-  riskCard: { padding: 24, borderRadius: 36, borderWidth: 1, marginBottom: 32 },
+  riskCard: { padding: 24, borderRadius: 36, borderWidth: 1, marginBottom: 32, shadowColor: '#000', shadowOffset: {width:0, height:3}, shadowOpacity:0.12, shadowRadius:8, elevation:4 },
   riskHeader: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 },
   riskTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },
   riskBody: { fontSize: 16, fontWeight: '600', lineHeight: 22, marginBottom: 20 },
   riskAction: { height: 56, borderRadius: 18, justifyContent: 'center', alignItems: 'center' },
   riskActionText: { color: 'white', fontWeight: '900', fontSize: 13, letterSpacing: 1 },
   heatmapContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 32 },
-  heatNode: { width: COLUMN_WIDTH, padding: 20, borderRadius: 28, borderWidth: 1, alignItems: 'center' },
+  heatNode: { width: COLUMN_WIDTH, padding: 20, borderRadius: 28, borderWidth: 1, alignItems: 'center', shadowColor: '#000', shadowOffset: {width:0, height:2}, shadowOpacity:0.1, shadowRadius:6, elevation:3 },
   heatName: { fontSize: 12, fontWeight: '800', marginTop: 12 },
   heatVal: { fontSize: 24, fontWeight: '900', marginTop: 4 },
   heatLabel: { fontSize: 8, fontWeight: '800', opacity: 0.4, letterSpacing: 1 },
-  savingsCard: { borderRadius: 36, borderWidth: 1, overflow: 'hidden' },
+  savingsCard: { borderRadius: 36, borderWidth: 1, overflow: 'hidden', shadowColor: '#000', shadowOffset: {width:0, height:3}, shadowOpacity:0.12, shadowRadius:8, elevation:4 },
   blurPad: { padding: 28 },
   savingsHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
   savingsTitle: { fontSize: 10, fontWeight: '900', letterSpacing: 1.5 },

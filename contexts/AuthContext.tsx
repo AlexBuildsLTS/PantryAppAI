@@ -10,6 +10,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback, use
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Tables } from '../types/database.types';
+import { OnboardingService } from '../services/OnboardingService';
 
 type Profile = Tables<'profiles'>;
 type Household = Tables<'households'>;
@@ -21,7 +22,9 @@ interface AuthContextType {
   household: Household | null;
   isLoading: boolean;
   refreshMetadata: () => Promise<void>;
-  signOut: () => Promise<void>; // Added signOut to context type
+  signIn: (email: string, password: string) => Promise<{ error: any }>; // Added
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: any }>; // Added
+  signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -95,6 +98,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [hydrateMetadata]);
 
+
+  // --- AUTH METHODS ---
+  const signIn = useCallback(async (email: string, password: string) => {
+    const { error, data } = await supabase.auth.signInWithPassword({ email, password });
+    if (!error && data?.user) {
+      await hydrateMetadata(data.user.id);
+    }
+    return { error };
+  }, [hydrateMetadata]);
+
+  const signUp = useCallback(async (email: string, password: string, fullName: string) => {
+    const { error, data } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { full_name: fullName },
+      },
+    });
+    if (!error && data?.user?.id) {
+      // Run full onboarding automation
+      await OnboardingService.onboardUser(data.user.id, fullName);
+    }
+    return { error };
+  }, []);
+
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setSession(null);
@@ -112,8 +140,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshMetadata: async () => {
       if (session?.user) await hydrateMetadata(session.user.id);
     },
-    signOut // Added signOut to context value
-  }), [session, profile, household, isLoading, hydrateMetadata, signOut]);
+    signIn,
+    signUp,
+    signOut
+  }), [session, profile, household, isLoading, hydrateMetadata, signIn, signUp, signOut]);
 
   return (
     <AuthContext.Provider value={value}>

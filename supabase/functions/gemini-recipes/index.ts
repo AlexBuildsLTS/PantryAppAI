@@ -11,6 +11,29 @@ Deno.serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
 
   try {
+    let body, householdId;
+    try {
+      body = await req.json();
+      householdId = body.householdId;
+    } catch (parseErr) {
+      return new Response(JSON.stringify({
+        error: 'Invalid or missing JSON body',
+        received: await req.text()
+      }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+    if (!householdId) {
+      return new Response(JSON.stringify({
+        error: 'Missing householdId in request body',
+        received: body
+      }), {
+        status: 400,
+        headers: corsHeaders,
+      });
+    }
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_ANON_KEY')!,
@@ -21,9 +44,13 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    const { data: items } = await supabaseClient
+    // Only fetch pantry items for the given household
+    const { data: items, error: pantryError } = await supabaseClient
       .from('pantry_items')
-      .select('name');
+      .select('name')
+      .eq('household_id', householdId);
+    if (pantryError) throw pantryError;
+
     const inventoryList = items?.map((i) => i.name).join(', ') || '';
 
     const prompt = `Based on these ingredients: [${inventoryList}], suggest 3 recipes. Return ONLY a JSON array.`;
@@ -50,7 +77,7 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error.message, stack: error.stack }), {
       status: 400,
       headers: corsHeaders,
     });

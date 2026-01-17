@@ -7,7 +7,7 @@
  * 3. Modern Styling: Uses boxShadow to comply with browser/native deprecation warnings.
  */
 
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, memo } from 'react';
 import {
   View,
   Text,
@@ -91,6 +91,7 @@ export default function RecipesScreen() {
    * MODULE 1: INTELLIGENCE PIPELINE
    * Fetches recipes from the Gemini AI Edge Function.
    */
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const {
     data: recipes = [],
     isLoading,
@@ -99,12 +100,28 @@ export default function RecipesScreen() {
   } = useQuery({
     queryKey: ['ai-recipes', household?.id],
     queryFn: async () => {
-      if (!household?.id) return [];
-      const { data, error } = await supabase.functions.invoke('gemini-recipes', {
-        body: { householdId: household.id }
-      });
-      if (error) throw error;
-      return (data.recipes || []) as Recipe[];
+      setFetchError(null);
+      if (!household?.id) {
+        setFetchError('No household found. Please join or create a household in settings.');
+        return [];
+      }
+      try {
+        const { data, error } = await supabase.functions.invoke('gemini-recipes', {
+          body: { householdId: household.id },
+        });
+        if (error) {
+          setFetchError(error.message || 'Failed to fetch recipes.');
+          return [];
+        }
+        if (data?.error) {
+          setFetchError(data.error + (data.received ? `\nReceived: ${JSON.stringify(data.received)}` : ''));
+          return [];
+        }
+        return (data.recipes || []) as Recipe[];
+      } catch (err: any) {
+        setFetchError(err.message || 'Unknown error fetching recipes.');
+        return [];
+      }
     },
     enabled: !!household?.id,
     staleTime: 1000 * 60 * 15,
@@ -156,6 +173,12 @@ export default function RecipesScreen() {
           <View style={styles.loaderWrap}>
             <ActivityIndicator color={colors.primary} size="large" />
             <Text style={[styles.loaderText, { color: colors.textSecondary }]}>SYNCING INVENTORY...</Text>
+          </View>
+        ) : fetchError ? (
+          <View style={styles.loaderWrap}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={48} color={colors.border} style={{ marginBottom: 16 }} />
+            <Text style={[styles.loaderText, { color: colors.textSecondary }]}>Error: {fetchError}</Text>
+            <Text style={[styles.loaderText, { color: colors.textSecondary, fontWeight: '400', fontSize: 13, marginTop: 8 }]}>Check your household settings or try again.</Text>
           </View>
         ) : recipes.length === 0 ? (
           <View style={styles.loaderWrap}>
