@@ -7,7 +7,7 @@
  * @author Pantry Pal Engineering
  */
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   View,
   Text,
@@ -35,41 +35,34 @@ import { Tables } from '../../types/database.types';
 
 type PantryItem = Tables<'pantry_items'>;
 
-export default function NotificationsScreen() {
-  const { colors } = useTheme();
-  const queryClient = useQueryClient();
+const EXPIRY_WINDOW_DAYS = 3;
 
-  /**
-   * DATA FETCHING: Critical Expiration Logic
-   * Filters for items expiring between "Now" and "3 Days from Now".
-   */
-  const {
-    data: alerts = [],
-    isLoading,
-    refetch,
-    isRefetching,
-  } = useQuery({
+// Custom hook for fetching expiry alerts
+const useExpiryAlerts = () => {
+  return useQuery({
     queryKey: ['expiry-alerts'],
     queryFn: async (): Promise<PantryItem[]> => {
-      const threeDaysFromNow = new Date();
-      threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+      const now = new Date();
+      const expiryThreshold = new Date(now);
+      expiryThreshold.setDate(now.getDate() + EXPIRY_WINDOW_DAYS);
 
       const { data, error } = await supabase
         .from('pantry_items')
         .select('*')
-        .lte('expiry_date', threeDaysFromNow.toISOString())
+        .lte('expiry_date', expiryThreshold.toISOString())
         .order('expiry_date', { ascending: true });
 
       if (error) throw error;
       return data || [];
     },
   });
+};
 
-  /**
-   * MUTATION: Resolve Alert (Consume/Delete)
-   * Updates the global pantry cache to immediately reflect resolution.
-   */
-  const resolveMutation = useMutation({
+// Custom hook for resolving (deleting) an item
+const useResolveItem = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('pantry_items')
@@ -86,8 +79,106 @@ export default function NotificationsScreen() {
       Alert.alert('Error', 'Could not remove item. Please try again.');
     },
   });
+};
 
-  const handleResolve = (item: PantryItem) => {
+// Utility function to safely format expiry date
+const formatExpiryDate = (expiryDate: string | null): string => {
+  if (!expiryDate) return 'Unknown';
+  try {
+    return new Date(expiryDate).toLocaleDateString();
+  } catch {
+    return 'Invalid Date';
+  }
+};
+
+// AlertCard component for better separation of concerns
+const AlertCard = React.memo<{
+  item: PantryItem;
+  index: number;
+  colors: any;
+  onPress: (item: PantryItem) => void;
+}>(({ item, index, colors, onPress }) => {
+  const expiryDate = new Date(item.expiry_date || '');
+  const isExpired = !isNaN(expiryDate.getTime()) && expiryDate < new Date();
+  const formattedDate = formatExpiryDate(item.expiry_date);
+
+  return (
+    <Animated.View
+      key={item.id}
+      entering={FadeInDown.delay(index * 100)}
+      exiting={FadeOutLeft}
+      layout={Layout.springify()}
+    >
+      <TouchableOpacity
+        activeOpacity={0.9}
+        onPress={() => onPress(item)}
+        style={[
+          styles.alertCard,
+          {
+            backgroundColor: isExpired
+              ? 'rgba(239, 68, 68, 0.1)'
+              : 'rgba(245, 158, 11, 0.1)',
+            borderColor: isExpired
+              ? 'rgba(239, 68, 68, 0.2)'
+              : 'rgba(245, 158, 11, 0.2)',
+          },
+        ]}
+        accessibilityLabel={`Alert for ${item.name}, ${isExpired ? 'expired' : 'expires soon'} on ${formattedDate}`}
+        accessibilityRole="button"
+      >
+        <View
+          style={[
+            styles.iconContainer,
+            {
+              backgroundColor: isExpired ? colors.error : colors.warning,
+            },
+          ]}
+        >
+          <Feather
+            name={isExpired ? 'x-circle' : 'alert-triangle'}
+            size={20}
+            color="white"
+          />
+        </View>
+
+        <View style={styles.itemInfo}>
+          <Text style={[styles.itemName, { color: colors.text }]}>
+            {item.name || 'Unnamed Item'}
+          </Text>
+          <Text
+            style={[
+              styles.expiryStatus,
+              {
+                color: isExpired ? colors.error : colors.warning,
+              },
+            ]}
+          >
+            {isExpired ? 'EXPIRED' : 'EXPIRES SOON'} • {formattedDate}
+          </Text>
+        </View>
+
+        <Feather
+          name="chevron-right"
+          size={20}
+          color={colors.textSecondary}
+        />
+      </TouchableOpacity>
+    </Animated.View>
+  );
+});
+
+export default function NotificationsScreen() {
+  const { colors } = useTheme();
+  const {
+    data: alerts = [],
+    isLoading,
+    error,
+    refetch,
+    isRefetching,
+  } = useExpiryAlerts();
+  const resolveMutation = useResolveItem();
+
+  const handleResolve = useCallback((item: PantryItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     Alert.alert(
       'Resolve Alert',
@@ -101,7 +192,30 @@ export default function NotificationsScreen() {
         },
       ]
     );
-  };
+  }, [resolveMutation]);
+
+  if (error) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.background }]}
+      >
+        <View style={styles.errorContainer}>
+          <Feather name="alert-triangle" size={48} color={colors.error} />
+          <Text style={[styles.errorTitle, { color: colors.text }]}>
+            Failed to Load Alerts
+          </Text>
+          <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+            There was an error fetching your expiry alerts. Please try again.
+          </Text>
+          <TouchableOpacity onPress={() => refetch()}>
+            <Text style={[styles.retryText, { color: colors.primary }]}>
+              Retry
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -137,74 +251,15 @@ export default function NotificationsScreen() {
         ) : (
           <View style={styles.listContainer}>
             {alerts.length > 0 ? (
-              alerts.map((item, index) => {
-                const isExpired = new Date(item.expiry_date!) < new Date();
-
-                return (
-                  <Animated.View
-                    key={item.id}
-                    entering={FadeInDown.delay(index * 100)}
-                    exiting={FadeOutLeft}
-                    layout={Layout.springify()}
-                  >
-                    <TouchableOpacity
-                      activeOpacity={0.9}
-                      onPress={() => handleResolve(item)}
-                      style={[
-                        styles.alertCard,
-                        {
-                          backgroundColor: isExpired
-                            ? 'rgba(239, 68, 68, 0.1)'
-                            : 'rgba(245, 158, 11, 0.1)',
-                          borderColor: isExpired
-                            ? 'rgba(239, 68, 68, 0.2)'
-                            : 'rgba(245, 158, 11, 0.2)',
-                        },
-                      ]}
-                    >
-                      <View
-                        style={[
-                          styles.iconContainer,
-                          {
-                            backgroundColor: isExpired
-                              ? colors.error
-                              : colors.warning,
-                          },
-                        ]}
-                      >
-                        <Feather
-                          name={isExpired ? 'x-circle' : 'alert-triangle'}
-                          size={20}
-                          color="white"
-                        />
-                      </View>
-
-                      <View style={styles.itemInfo}>
-                        <Text style={[styles.itemName, { color: colors.text }]}>
-                          {item.name}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.expiryStatus,
-                            {
-                              color: isExpired ? colors.error : colors.warning,
-                            },
-                          ]}
-                        >
-                          {isExpired ? 'EXPIRED' : 'EXPIRES SOON'} •{' '}
-                          {new Date(item.expiry_date!).toLocaleDateString()}
-                        </Text>
-                      </View>
-
-                      <Feather
-                        name="chevron-right"
-                        size={20}
-                        color={colors.textSecondary}
-                      />
-                    </TouchableOpacity>
-                  </Animated.View>
-                );
-              })
+              alerts.map((item, index) => (
+                <AlertCard
+                  key={item.id}
+                  item={item}
+                  index={index}
+                  colors={colors}
+                  onPress={handleResolve}
+                />
+              ))
             ) : (
               <Animated.View
                 entering={FadeInDown}
@@ -247,6 +302,8 @@ export default function NotificationsScreen() {
     </SafeAreaView>
   );
 }
+
+AlertCard.displayName = 'AlertCard';
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
@@ -298,4 +355,8 @@ const styles = StyleSheet.create({
   },
   emptyTitle: { fontSize: 22, fontWeight: '900', marginBottom: 8 },
   emptyText: { textAlign: 'center', fontSize: 14, lineHeight: 22 },
+  errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
+  errorTitle: { fontSize: 22, fontWeight: '900', marginTop: 16, marginBottom: 8 },
+  errorText: { fontSize: 14, lineHeight: 22, textAlign: 'center', marginBottom: 24 },
+  retryText: { fontSize: 16, fontWeight: '600' },
 });

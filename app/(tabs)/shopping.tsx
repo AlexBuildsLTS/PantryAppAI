@@ -1,10 +1,12 @@
 /**
  * @file app/(tabs)/shopping.tsx
  * @description Master Grocery Supply Chain & Aisle-Sorting Engine.
- * FIXES: 
- * 1. Import Resolution: Points to ../../lib/supabase singleton.
- * 2. Schema Sync: Restock logic matches NOT NULL 'expiry_date' in pantry_items.
- * 3. Modern Styling: Uses boxShadow for High-Fidelity Web/Native parity.
+ * IMPROVEMENTS:
+ * - Refactored data logic into ShoppingService for better separation of concerns
+ * - Added custom React Query hooks for reusable logic
+ * - Improved error handling with user-friendly alerts
+ * - Enhanced performance with better memoization
+ * - Cleaner component structure
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
@@ -22,10 +24,8 @@ import {
   Alert,
   ActivityIndicator
 } from 'react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import * as Haptics from 'expo-haptics';
 import Animated, {
   FadeInRight,
   FadeOutLeft,
@@ -33,86 +33,55 @@ import Animated, {
 } from 'react-native-reanimated';
 
 // INTERNAL SYSTEM CORE
-import { supabase } from '../../lib/supabase';
 import { Tables } from '../../types/database.types';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
+import {
+  useActiveShoppingList,
+  useShoppingListItems,
+  useAddShoppingItem,
+  useToggleShoppingItem,
+  useRestockItems
+} from '../../hooks/useShopping';
 
 type ShoppingListItem = Tables<'shopping_list_items'>;
-type ShoppingList = Tables<'shopping_lists'>;
 
 export default function ShoppingScreen() {
   const { colors, isDark } = useTheme();
-  const { household, user } = useAuth();
-  const queryClient = useQueryClient();
+  const { household } = useAuth();
   const [newItemName, setNewItemName] = useState('');
 
-  const householdId = household?.id;
+  // Custom hooks for data management
+  const {
+    data: activeList,
+    isLoading: isListLoading,
+    error: listError
+  } = useActiveShoppingList();
 
-  /**
-   * MODULE 1: ACTIVE LIST RESOLVER
-   * Description: Fetches or bootstraps the primary household shopping list.
-   */
-  const { data: activeList, isLoading: isListLoading } = useQuery({
-    queryKey: ['active-list', householdId],
-    queryFn: async () => {
-      if (!householdId) return null;
-
-      const { data, error } = await supabase
-        .from('shopping_lists')
-        .select('*')
-        .eq('household_id', householdId)
-        .eq('is_completed', false)
-        .maybeSingle();
-
-      if (error) throw error;
-
-      if (!data) {
-        // Create initial 'Main Grocery' list for new households
-        const { data: newList, error: createError } = await supabase
-          .from('shopping_lists')
-          .insert({
-            household_id: householdId,
-            name: 'Main Grocery',
-            is_completed: false
-          })
-          .select()
-          .single();
-
-        if (createError) throw createError;
-        return newList as ShoppingList;
-      }
-      return data as ShoppingList;
-    },
-    enabled: !!householdId,
-  });
-
-  /**
-   * MODULE 2: ITEM HYDRATION
-   */
   const {
     data: items = [],
     refetch,
     isRefetching,
-    isLoading: isItemsLoading
-  } = useQuery({
-    queryKey: ['shopping-items', activeList?.id],
-    queryFn: async () => {
-      if (!activeList?.id) return [];
-      const { data, error } = await supabase
-        .from('shopping_list_items')
-        .select('*')
-        .eq('list_id', activeList.id)
-        .order('created_at', { ascending: false });
+    isLoading: isItemsLoading,
+    error: itemsError
+  } = useShoppingListItems(activeList?.id);
 
-      if (error) throw error;
-      return data as ShoppingListItem[];
-    },
-    enabled: !!activeList?.id,
-  });
+  const addItemMutation = useAddShoppingItem();
+  const toggleMutation = useToggleShoppingItem();
+  const restockMutation = useRestockItems();
+
+  // Handle errors from queries
+  React.useEffect(() => {
+    if (listError) {
+      Alert.alert('Error', 'Failed to load shopping list. Please try again.');
+    }
+    if (itemsError) {
+      Alert.alert('Error', 'Failed to load shopping items. Please refresh.');
+    }
+  }, [listError, itemsError]);
 
   /**
-   * MODULE 3: AISLE INTELLIGENCE (Automatic Categorization)
+   * AISLE INTELLIGENCE (Automatic Categorization)
    */
   const groupedItems = useMemo(() => {
     const groups: Record<string, ShoppingListItem[]> = {};
@@ -131,77 +100,58 @@ export default function ShoppingScreen() {
   }, [items]);
 
   /**
-   * MODULE 4: MUTATIONS (Atomic Supply Chain Operations)
+   * Handle adding new item with error feedback
    */
-  const addItemMutation = useMutation({
-    mutationFn: async (name: string) => {
-      if (!activeList?.id || !user?.id) return;
-      return supabase.from('shopping_list_items').insert({
-        list_id: activeList.id,
-        name,
-        added_by: user.id,
-        category: 'Pantry Essentials',
-        is_bought: false
-      });
-    },
-    onSuccess: () => {
+  const handleAddItem = useCallback(async () => {
+    const trimmedName = newItemName.trim();
+    if (!trimmedName) return;
+
+    if (!activeList?.id) {
+      Alert.alert('Error', 'No active shopping list available.');
+      return;
+    }
+
+    try {
+      await addItemMutation.mutateAsync({ listId: activeList.id, name: trimmedName });
       setNewItemName('');
-      queryClient.invalidateQueries({ queryKey: ['shopping-items'] });
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    },
-  });
+    } catch {
+      Alert.alert('Error', 'Failed to add item. Please try again.');
+    }
+  }, [newItemName, activeList?.id, addItemMutation]);
 
-  const toggleMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: boolean }) => {
-      return supabase
-        .from('shopping_list_items')
-        .update({ is_bought: !status } as any)
-        .eq('id', id);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shopping-items'] });
-      if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    },
-  });
+  /**
+   * Handle toggling item status with error feedback
+   */
+  const handleToggleItem = useCallback(async (item: ShoppingListItem) => {
+    try {
+      await toggleMutation.mutateAsync({
+        itemId: item.id,
+        currentStatus: Boolean(item.is_bought),
+        listId: activeList!.id
+      });
+    } catch {
+      Alert.alert('Error', 'Failed to update item. Please try again.');
+    }
+  }, [activeList, toggleMutation]);
 
-  const restockMutation = useMutation({
-    mutationFn: async () => {
-      const boughtItems = items.filter((i) => i.is_bought);
-      if (boughtItems.length === 0 || !householdId || !user?.id) return;
+  /**
+   * Handle restocking with error feedback
+   */
+  const handleRestock = useCallback(async () => {
+    const boughtItems = items.filter((i) => i.is_bought);
+    if (boughtItems.length === 0) return;
 
-      // Map bought items to Pantry Schema
-      // FIX: Added 'expiry_date' to satisfy NOT NULL database constraint
-      const pantryInserts = boughtItems.map((item) => ({
-        household_id: householdId,
-        user_id: user.id,
-        name: item.name,
-        category: item.category || 'Other',
-        quantity: item.quantity || 1,
-        unit: 'pcs',
-        status: 'fresh' as const,
-        expiry_date: new Date(Date.now() + 7 * 86400000).toISOString()
-      }));
-
-      // 1. Commit to Inventory
-      const { error: insertError } = await supabase.from('pantry_items').insert(pantryInserts);
-      if (insertError) throw insertError;
-
-      // 2. Clear from Shopping List
-      const { error: deleteError } = await supabase
-        .from('shopping_list_items')
-        .delete()
-        .in('id', boughtItems.map((i) => i.id));
-
-      if (deleteError) throw deleteError;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['shopping-items'] });
-      queryClient.invalidateQueries({ queryKey: ['pantry-inventory'] });
-      if (Platform.OS !== 'web') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    try {
+      await restockMutation.mutateAsync(boughtItems);
       Alert.alert('Pantry Synced', 'Bought items moved to inventory.');
-    },
-  });
+    } catch {
+      Alert.alert('Error', 'Failed to restock items. Please try again.');
+    }
+  }, [items, restockMutation]);
 
+  /**
+   * Optimized render item with better memoization
+   */
   const renderItem = useCallback(
     ({ item, index }: { item: ShoppingListItem; index: number }) => (
       <Animated.View
@@ -212,12 +162,13 @@ export default function ShoppingScreen() {
       >
         <TouchableOpacity
           activeOpacity={0.8}
-          onPress={() => toggleMutation.mutate({ id: item.id, status: Boolean(item.is_bought) })}
+          onPress={() => handleToggleItem(item)}
           style={[
             styles.itemCard,
             { backgroundColor: colors.surface, borderColor: colors.border },
             item.is_bought && { opacity: 0.5 },
           ]}
+          disabled={toggleMutation.isPending}
         >
           <View style={styles.itemLeft}>
             <View style={[
@@ -239,8 +190,11 @@ export default function ShoppingScreen() {
         </TouchableOpacity>
       </Animated.View>
     ),
-    [colors, toggleMutation]
+    [colors, handleToggleItem, toggleMutation.isPending]
   );
+
+  const isLoading = isListLoading || isItemsLoading;
+  const isAnyMutationPending = addItemMutation.isPending || toggleMutation.isPending || restockMutation.isPending;
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -254,10 +208,11 @@ export default function ShoppingScreen() {
             </Text>
           </View>
 
-          {items.some(i => i.is_bought) && (
+          {items.some(i => i.is_bought) && !restockMutation.isPending && (
             <TouchableOpacity
-              onPress={() => restockMutation.mutate()}
+              onPress={handleRestock}
               style={[styles.restockBtn, { backgroundColor: colors.primary + '20' }]}
+              disabled={restockMutation.isPending}
             >
               <MaterialCommunityIcons name="package-variant-closed" size={18} color={colors.primary} />
               <Text style={[styles.restockText, { color: colors.primary }]}>RESTOCK</Text>
@@ -274,19 +229,25 @@ export default function ShoppingScreen() {
               placeholderTextColor={colors.textSecondary}
               value={newItemName}
               onChangeText={setNewItemName}
-              onSubmitEditing={() => newItemName.trim() && addItemMutation.mutate(newItemName.trim())}
+              onSubmitEditing={handleAddItem}
+              editable={!addItemMutation.isPending}
             />
             <TouchableOpacity
-              onPress={() => newItemName.trim() && addItemMutation.mutate(newItemName.trim())}
+              onPress={handleAddItem}
               style={[styles.addBtn, { backgroundColor: colors.primary }]}
+              disabled={addItemMutation.isPending || !newItemName.trim()}
             >
-              <Feather name="plus" size={24} color="white" />
+              {addItemMutation.isPending ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Feather name="plus" size={24} color="white" />
+              )}
             </TouchableOpacity>
           </BlurView>
         </View>
 
         {/* Content */}
-        {isListLoading || isItemsLoading ? (
+        {isLoading ? (
           <View style={styles.center}>
             <ActivityIndicator color={colors.primary} size="large" />
           </View>
@@ -312,6 +273,13 @@ export default function ShoppingScreen() {
               </View>
             )}
           />
+        )}
+
+        {/* Loading overlay for mutations */}
+        {isAnyMutationPending && (
+          <View style={[StyleSheet.absoluteFill, styles.loadingOverlay]}>
+            <ActivityIndicator color={colors.primary} size="large" />
+          </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -357,5 +325,11 @@ const styles = StyleSheet.create({
   strikethrough: { textDecorationLine: 'line-through', opacity: 0.6 },
   qtyText: { fontWeight: '900', fontSize: 14, opacity: 0.8 },
   empty: { alignItems: 'center', marginTop: 100 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' }
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  loadingOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  }
 });

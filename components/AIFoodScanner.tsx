@@ -1,9 +1,3 @@
-/**
- * @file components/AIFoodScanner.tsx
- * @description AAA+ Enterprise AI Vision Hardware Bridge.
- * FIXES: Missing expo-camera imports and silent browser permission blocking.
- * -----------------------------------------------------------------------------------
- */
 
 import React, { useState, useRef, useEffect } from 'react';
 import {
@@ -17,7 +11,6 @@ import {
   Platform
 } from 'react-native';
 
-// --- ABSOLUTE CRITICAL HARDWARE IMPORTS ---
 import { CameraView, useCameraPermissions } from 'expo-camera';
 
 import { BlurView } from 'expo-blur';
@@ -44,23 +37,32 @@ export default function AIFoodScanner({ onClose, onItemsDetected }: Props) {
    */
   const handleEnableCamera = async () => {
     try {
-      const result = await requestPermission();
-      if (!result.granted) {
-        Alert.alert(
-          "Permission Denied",
-          "Browser blocked camera. Click the 'Lock' icon in your address bar to reset."
-        );
+      const { granted, canAskAgain } = await requestPermission();
+      if (!granted) {
+        if (Platform.OS === 'web' && !canAskAgain) {
+          Alert.alert(
+            "Permission Blocked",
+            "Camera access has been permanently blocked by your browser. Please check your site settings or permissions menu."
+          );
+        } else {
+          Alert.alert(
+            "Permission Required",
+            "Camera access is required for AI Vision. Please grant permission when prompted."
+          );
+        }
       }
-    } catch (err) {
-      Alert.alert("Origin Error", "Camera requires HTTPS or Localhost context on Web.");
+    } catch (error) {
+      console.error("Camera permission request failed:", error);
+      Alert.alert("Initialization Error", "Failed to initiate camera permission request. Ensure secure context (HTTPS/Localhost) on Web.");
     }
   };
 
   const handleCapture = async () => {
-    if (!cameraRef.current || !isCameraReady || isCapturing) return;
+    if (isCapturing || !cameraRef.current) return;
 
     try {
       setIsCapturing(true);
+
       if (Platform.OS !== 'web') {
         await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
       }
@@ -72,10 +74,13 @@ export default function AIFoodScanner({ onClose, onItemsDetected }: Props) {
 
       if (photo?.base64) {
         onItemsDetected(photo.base64);
+      } else {
+        console.warn("[CAPTURE WARNING]: Captured photo did not contain base64 data.");
+        Alert.alert("Capture Incomplete", "Image buffer received without data payload.");
       }
     } catch (error) {
-      console.error("[HARDWARE ERROR]:", error);
-      Alert.alert("Capture Failed", "Failed to capture high-precision image buffer.");
+      console.error("[CAMERA HARDWARE ERROR]:", error);
+      Alert.alert("Capture Failed", "Failed to capture image. Ensure the camera is fully initialized.");
     } finally {
       setIsCapturing(false);
     }
@@ -87,7 +92,7 @@ export default function AIFoodScanner({ onClose, onItemsDetected }: Props) {
     </View>
   );
 
-  // VIEW 1: Permission Guard (The "Enable" Button)
+  // VIEW 1: Permission Guard (Initialization Required)
   if (!permission.granted) {
     return (
       <Modal visible animationType="fade" transparent={false}>
@@ -95,14 +100,14 @@ export default function AIFoodScanner({ onClose, onItemsDetected }: Props) {
           <MaterialCommunityIcons name="camera-off" size={84} color={colors.error} />
           <Text style={[styles.permTitle, { color: colors.text }]}>Hardware Access Restricted</Text>
           <Text style={[styles.permSub, { color: colors.textSecondary }]}>
-            Gemini AI Vision requires a direct hardware bridge to your camera. Click below to initialize the secure connection.
+            AI Vision requires direct camera access. Please enable permissions via your browser settings or click below to attempt re-initialization.
           </Text>
 
           <TouchableOpacity
             style={[styles.btn, { backgroundColor: colors.primary }]}
             onPress={handleEnableCamera}
           >
-            <Text style={styles.btnText}>ENABLE AI VISION</Text>
+            <Text style={styles.btnText}>REQUEST CAMERA PERMISSION</Text>
           </TouchableOpacity>
 
           <TouchableOpacity onPress={onClose} style={styles.cancelBtn}>
@@ -135,10 +140,10 @@ export default function AIFoodScanner({ onClose, onItemsDetected }: Props) {
 
             <View style={styles.viewfinder}>
               {/* Intelligent Viewport Corners */}
-              <View style={[styles.corner, styles.tl, { borderColor: colors.primary }]} />
-              <View style={[styles.corner, styles.tr, { borderColor: colors.primary }]} />
-              <View style={[styles.corner, styles.bl, { borderColor: colors.primary }]} />
-              <View style={[styles.corner, styles.br, { borderColor: colors.primary }]} />
+              <View style={[styles.corner, styles.tl, { borderColor: colors.primary, shadowColor: 'white', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 5 }]} />
+              <View style={[styles.corner, styles.tr, { borderColor: colors.primary, shadowColor: 'white', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 5 }]} />
+              <View style={[styles.corner, styles.bl, { borderColor: colors.primary, shadowColor: 'white', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 5 }]} />
+              <View style={[styles.corner, styles.br, { borderColor: colors.primary, shadowColor: 'white', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.8, shadowRadius: 5 }]} />
             </View>
 
             <BlurView intensity={30} tint="dark" style={styles.controlBar}>
@@ -179,7 +184,7 @@ const styles = StyleSheet.create({
   bl: { bottom: 0, left: 0, borderRightWidth: 0, borderTopWidth: 0, borderBottomLeftRadius: 24 },
   br: { bottom: 0, right: 0, borderLeftWidth: 0, borderTopWidth: 0, borderBottomRightRadius: 24 },
   controlBar: { height: 180, alignItems: 'center', justifyContent: 'center', borderTopLeftRadius: 40, borderTopRightRadius: 40, overflow: 'hidden' },
-  shutter: { width: 84, height: 84, borderRadius: 42, borderWidth: 6, padding: 4, justifyContent: 'center', alignItems: 'center' },
-  shutterInner: { width: '100%', height: '100%', borderRadius: 40, backgroundColor: 'white' },
+  shutter: { width: 88, height: 88, borderRadius: 44, borderWidth: 6, padding: 4, justifyContent: 'center', alignItems: 'center' },
+  shutterInner: { width: '100%', height: '100%', borderRadius: 42, backgroundColor: 'white', opacity: 0.95 },
   shutterLabel: { color: 'white', marginTop: 15, fontSize: 10, fontWeight: '900', letterSpacing: 2 }
 });

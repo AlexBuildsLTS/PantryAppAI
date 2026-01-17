@@ -36,7 +36,7 @@ export function useFrameworkReady(): boolean {
       try {
         // 2. Execute the native framework signal
         window.frameworkReady();
-      } catch (error) {
+      } catch {
       }
     }
 

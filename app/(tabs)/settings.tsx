@@ -1,19 +1,9 @@
 /**
  * @file settings.tsx
- * @description Master AAA+ Tier Command Center & Identity Hub.
- * * ARCHITECTURAL MODULES:
- * 1. IDENTITY ORCHESTRATION: Full-cycle profile management with Supabase Storage avatar sync.
- * - Implements Blob conversion for reliable mobile uploads.
- * - Features Optimistic UI for instantaneous visual feedback.
- * 2. HOUSEHOLD SYNC ENGINE: Real-time QR token generation for family synchronization.
- * 3. HARDWARE SECURITY BRIDGE: Native Biometric challenge & Password encryption updates.
- * 4. DYNAMIC THEME ENGINE: Context-aware shadow and glassmorphic palette swapping.
- * - Optimized for "Floating Bento" effect in Light Mode.
- * 5. SESSION TERMINATION: Implements the 'Hard Guard' logout protocol with Haptic feedback.
+ * @description PantryApp Settings Screen - User profile, household sync, and system preferences
  */
 
-/* cspell:disable */
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -46,72 +36,73 @@ import { useAuth } from '../../contexts/AuthContext';
 import { BiometricService } from '../../services/BiometricService';
 import { supabase } from '../../lib/supabase';
 
-export default function SettingsScreen() {
-  // --- DESIGN SYSTEM CONSUMPTION ---
-  const { colors, shadows, isDark, toggleTheme } = useTheme();
-  const { profile, user, household, refreshMetadata } = useAuth();
+// Constants
+const AVATAR_SIZE = 84;
+const MIN_PASSWORD_LENGTH = 8;
+const MIN_NAME_LENGTH = 2;
+const INVITE_LINK_BASE = 'pantrypal://join/';
 
-  // --- MODULE 1: ATOMIC STATE MANAGEMENT ---
+// Types
+interface Profile {
+  full_name: string | null;
+  avatar_url: string | null;
+  tier: string | null;
+}
+
+interface Household {
+  id?: string;
+  name?: string;
+}
+
+// Custom Hooks
+const useProfileState = (profile: Profile | null) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [isChangingPassword, setIsChangingPassword] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [showQR, setShowQR] = useState(false);
-  const [bioEnabled, setBioEnabled] = useState(true);
-
-  // --- MODULE 2: DATA SYNC HOOKS ---
   const [newName, setNewName] = useState(profile?.full_name || '');
-  const [newPassword, setNewPassword] = useState('');
-  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  // Synchronize local form state with profile hydration
   useEffect(() => {
-    if (profile?.full_name) {
-      setNewName(profile.full_name);
-    }
+    setNewName(profile?.full_name || '');
   }, [profile]);
 
-  /**
-   * MODULE 3: AVATAR PERSISTENCE LOGIC
-   * Description: Handles native ImagePicker, Blob conversion, and Storage upload.
-   * Implementation: Uses Optimistic UI to remove perceived latency.
-   */
-  const handlePickAvatar = async () => {
-    if (!user?.id) {
+  return { isEditing, setIsEditing, newName, setNewName, loading, setLoading };
+};
+
+const useAvatarUpload = (userId: string | undefined, refreshMetadata: () => void) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const [localAvatar, setLocalAvatar] = useState<string | null>(null);
+
+  const handlePickAvatar = useCallback(async () => {
+    if (!userId) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Security', 'No active session detected.');
+      Alert.alert('Error', 'No active session detected.');
       return;
     }
 
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission',
-        'Camera roll access is required to update your avatar.'
-      );
-      return;
-    }
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Camera roll access is required to update your avatar.');
+        return;
+      }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.4, // Optimized for network efficiency
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.4,
+      });
 
-    if (!result.canceled && result.assets[0]) {
-      const asset = result.assets[0];
-      setIsUploading(true);
-      setLocalAvatar(asset.uri); // Instant visual feedback (Optimistic UI)
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        setIsUploading(true);
+        setLocalAvatar(asset.uri);
 
-      try {
         const fileExt = asset.uri.split('.').pop();
-        const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+        const fileName = `${userId}/${Date.now()}.${fileExt}`;
         const filePath = fileName;
 
-        // ENTERPRISE FIX: Blob conversion for reliable mobile uploads
         const response = await fetch(asset.uri);
         const blob = await response.blob();
 
@@ -124,37 +115,336 @@ export default function SettingsScreen() {
 
         if (uploadError) throw uploadError;
 
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from('avatars').getPublicUrl(filePath);
+        const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath);
 
-        // Atomic update to the profile record
         const { error: updateError } = await supabase
           .from('profiles')
           .update({ avatar_url: publicUrl })
-          .eq('id', user.id);
+          .eq('id', userId);
 
         if (updateError) throw updateError;
 
         await refreshMetadata();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (err: unknown) {
-        setLocalAvatar(null); // Rollback on failure
-        Alert.alert('Cloud Sync Failure', err instanceof Error ? err.message : 'Unknown error');
-      } finally {
-        setIsUploading(false);
       }
+    } catch (error) {
+      setLocalAvatar(null);
+      Alert.alert('Upload Failed', error instanceof Error ? error.message : 'Unknown error occurred.');
+    } finally {
+      setIsUploading(false);
     }
-  };
+  }, [userId, refreshMetadata]);
 
-  /**
-   * MODULE 4: PROFILE IDENTITY MANAGEMENT
-   * Description: Updates core user metadata with a high-fidelity dropdown panel.
-   */
-  const handleUpdateProfile = async () => {
+  return { isUploading, localAvatar, handlePickAvatar };
+};
+
+const useBiometricToggle = () => {
+  const [bioEnabled, setBioEnabled] = useState(true);
+
+  const handleToggle = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const success = await BiometricService.authenticate();
+    if (success) {
+      setBioEnabled(prev => !prev);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } else {
+      Alert.alert('Authentication Failed', 'Unable to verify biometric credentials.');
+    }
+  }, []);
+
+  return { bioEnabled, handleToggle };
+};
+
+// Sub-components
+const ProfileSection: React.FC<{
+  profile: Profile | null;
+  user: any;
+  colors: any;
+  shadows: any;
+  isDark: boolean;
+  isEditing: boolean;
+  setIsEditing: (editing: boolean) => void;
+  newName: string;
+  setNewName: (name: string) => void;
+  loading: boolean;
+  setLoading: (loading: boolean) => void;
+  isUploading: boolean;
+  localAvatar: string | null;
+  handlePickAvatar: () => void;
+  handleUpdateProfile: () => void;
+  refreshMetadata: () => void;
+}> = React.memo(({
+  profile,
+  user,
+  colors,
+  shadows,
+  isDark,
+  isEditing,
+  setIsEditing,
+  newName,
+  setNewName,
+  loading,
+  isUploading,
+  localAvatar,
+  handlePickAvatar,
+  handleUpdateProfile,
+}) => {
+  const cardStyle = useMemo(
+    () => [
+      styles.glassCard,
+      {
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.85)',
+        borderColor: colors.border,
+      },
+      !isDark && shadows.medium,
+    ],
+    [colors.border, isDark, shadows.medium]
+  );
+
+  return (
+    <Animated.View entering={FadeInDown.delay(100)} style={cardStyle}>
+      <View style={styles.profileHeader}>
+        <TouchableOpacity
+          onPress={handlePickAvatar}
+          style={styles.avatarWrapper}
+          disabled={isUploading}
+        >
+          <Image
+            source={{
+              uri: localAvatar || profile?.avatar_url || `https://ui-avatars.com/api/?name=${profile?.full_name || 'User'}&background=6366F1&color=fff`,
+            }}
+            style={[styles.avatar, isUploading && { opacity: 0.5 }]}
+          />
+          {isUploading && (
+            <View style={styles.avatarLoader}>
+              <ActivityIndicator color={colors.primary} />
+            </View>
+          )}
+          <View style={[styles.editBadge, { backgroundColor: colors.primary }]}>
+            <Feather name="camera" size={12} color="white" />
+          </View>
+        </TouchableOpacity>
+
+        <View style={styles.profileInfo}>
+          <Text style={[styles.name, { color: colors.text }]}>
+            {profile?.full_name || 'User'}
+          </Text>
+          <Text style={[styles.email, { color: colors.textSecondary }]}>
+            {user?.email || ''}
+          </Text>
+          <View style={[styles.tierBadge, { backgroundColor: colors.primary + '20' }]}>
+            <MaterialCommunityIcons name="star-circle" size={10} color={colors.primary} />
+            <Text style={[styles.tierText, { color: colors.primary }]}>
+              {profile?.tier?.toUpperCase() || 'FREE TIER'}
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => {
+            Haptics.selectionAsync();
+            setIsEditing(!isEditing);
+          }}
+          style={styles.actionBtn}
+        >
+          <Feather name={isEditing ? 'chevron-up' : 'edit-3'} size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+
+      {isEditing && (
+        <Animated.View entering={FadeInUp} layout={Layout.springify()} style={styles.editPanel}>
+          <View style={[styles.inputBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Feather name="user" size={16} color={colors.textSecondary} style={{ marginRight: 12 }} />
+            <TextInput
+              value={newName}
+              onChangeText={setNewName}
+              style={[styles.input, { color: colors.text }]}
+              placeholder="Update Full Name"
+              placeholderTextColor={colors.textSecondary}
+              autoCorrect={false}
+            />
+          </View>
+          <TouchableOpacity
+            style={[styles.saveBtn, { backgroundColor: colors.primary }, shadows.small]}
+            onPress={handleUpdateProfile}
+            disabled={loading}
+          >
+            {loading ? (
+              <ActivityIndicator color="white" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </Animated.View>
+  );
+});
+
+ProfileSection.displayName = 'ProfileSection';
+
+const HouseholdSection: React.FC<{
+  household: Household | null;
+  colors: any;
+  shadows: any;
+  isDark: boolean;
+}> = React.memo(({ household, colors, shadows, isDark }) => {
+  const [showQR, setShowQR] = useState(false);
+
+  const cardStyle = useMemo(
+    () => [
+      styles.glassCard,
+      {
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.85)',
+        borderColor: colors.border,
+      },
+      !isDark && shadows.medium,
+    ],
+    [colors.border, isDark, shadows.medium]
+  );
+
+  const inviteLink = useMemo(
+    () => `${INVITE_LINK_BASE}${household?.id || 'none'}`,
+    [household?.id]
+  );
+
+  return (
+    <>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        HOUSEHOLD SYNC ENGINE
+      </Text>
+      <View style={cardStyle}>
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => {
+            setShowQR(!showQR);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          }}
+        >
+          <View style={styles.rowLeft}>
+            <View style={[styles.iconBox, { backgroundColor: '#8B5CF620' }]}>
+              <MaterialCommunityIcons name="home-group" size={22} color="#8B5CF6" />
+            </View>
+            <View>
+              <Text style={[styles.rowLabel, { color: colors.text }]}>
+                {household?.name || 'Primary Kitchen'}
+              </Text>
+              <Text style={[styles.rowSubLabel, { color: colors.textSecondary }]}>
+                Tap to reveal invite QR for sync
+              </Text>
+            </View>
+          </View>
+          <Feather name={showQR ? 'chevron-up' : 'share'} size={20} color={colors.primary} />
+        </TouchableOpacity>
+
+        {showQR && (
+          <Animated.View entering={FadeInUp} layout={Layout.springify()} style={styles.qrContainer}>
+            <View style={[styles.qrWrapper, shadows.medium]}>
+              <QRCode value={inviteLink} size={160} backgroundColor="white" />
+            </View>
+            <Text style={[styles.qrHint, { color: colors.textSecondary }]}>
+              Synchronize your pantry across multiple devices in real-time.
+            </Text>
+          </Animated.View>
+        )}
+      </View>
+    </>
+  );
+});
+
+HouseholdSection.displayName = 'HouseholdSection';
+
+const PreferencesSection: React.FC<{
+  colors: any;
+  shadows: any;
+  isDark: boolean;
+  toggleTheme: () => void;
+  bioEnabled: boolean;
+  handleBiometricToggle: () => void;
+  setIsChangingPassword: (changing: boolean) => void;
+}> = React.memo(({ colors, shadows, isDark, toggleTheme, bioEnabled, handleBiometricToggle, setIsChangingPassword }) => {
+  const cardStyle = useMemo(
+    () => [
+      styles.glassCard,
+      {
+        backgroundColor: isDark ? 'rgba(30, 41, 59, 0.7)' : 'rgba(255, 255, 255, 0.85)',
+        borderColor: colors.border,
+      },
+      !isDark && shadows.medium,
+    ],
+    [colors.border, isDark, shadows.medium]
+  );
+
+  return (
+    <>
+      <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
+        SYSTEM ARCHITECTURE
+      </Text>
+      <View style={cardStyle}>
+        <View style={styles.row}>
+          <View style={styles.rowLeft}>
+            <View style={[styles.iconBox, { backgroundColor: isDark ? '#334155' : '#F1F5F9' }]}>
+              <Feather name={isDark ? 'moon' : 'sun'} size={18} color={isDark ? '#94A3B8' : '#64748B'} />
+            </View>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>Dark Appearance</Text>
+          </View>
+          <Switch
+            value={isDark}
+            onValueChange={() => {
+              Haptics.selectionAsync();
+              toggleTheme();
+            }}
+            trackColor={{ true: colors.primary, false: '#CBD5E1' }}
+          />
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        <View style={styles.row}>
+          <View style={styles.rowLeft}>
+            <View style={[styles.iconBox, { backgroundColor: '#10B98120' }]}>
+              <Feather name="shield" size={18} color="#10B981" />
+            </View>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>Biometric Security</Text>
+          </View>
+          <Switch value={bioEnabled} onValueChange={handleBiometricToggle} trackColor={{ true: '#10B981' }} />
+        </View>
+
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        <TouchableOpacity
+          style={styles.row}
+          onPress={() => setIsChangingPassword(true)}
+        >
+          <View style={styles.rowLeft}>
+            <View style={[styles.iconBox, { backgroundColor: '#F59E0B20' }]}>
+              <Feather name="lock" size={18} color="#F59E0B" />
+            </View>
+            <Text style={[styles.rowLabel, { color: colors.text }]}>Update Password</Text>
+          </View>
+          <Feather name="chevron-right" size={18} color={colors.textSecondary} />
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+});
+
+PreferencesSection.displayName = 'PreferencesSection';
+
+export default function SettingsScreen() {
+  const { colors, shadows, isDark, toggleTheme } = useTheme();
+  const { profile, user, household, refreshMetadata } = useAuth();
+
+  const { isEditing, setIsEditing, newName, setNewName, loading, setLoading } = useProfileState(profile);
+  const { isUploading, localAvatar, handlePickAvatar } = useAvatarUpload(user?.id, refreshMetadata);
+  const { bioEnabled, handleToggle: handleBiometricToggle } = useBiometricToggle();
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+
+  const handleUpdateProfile = useCallback(async () => {
     if (!user?.id) return;
-    if (newName.trim().length < 2) {
-      Alert.alert('Validation', 'Please enter a valid name.');
+    if (newName.trim().length < MIN_NAME_LENGTH) {
+      Alert.alert('Validation Error', `Please enter a name with at least ${MIN_NAME_LENGTH} characters.`);
       return;
     }
 
@@ -170,381 +460,103 @@ export default function SettingsScreen() {
       await refreshMetadata();
       setIsEditing(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    } catch (err: unknown) {
-      Alert.alert('Update Error', err instanceof Error ? err.message : 'Unknown error');
+    } catch (error) {
+      Alert.alert('Update Failed', error instanceof Error ? error.message : 'Unknown error occurred.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, newName, refreshMetadata, setLoading, setIsEditing]);
 
-  /**
-   * MODULE 5: HARDWARE SECURITY CHALLENGE
-   * Description: Binds native biometrics and password encryption to the identity.
-   */
-  const handleBiometricToggle = async () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    const success = await BiometricService.authenticate();
-    if (success) {
-      setBioEnabled(!bioEnabled);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    }
-  };
-
-  const handleUpdatePassword = async () => {
-    if (newPassword.length < 8) {
-      Alert.alert(
-        'Security',
-        'Enterprise standards require at least 8 characters.'
-      );
+  const handleUpdatePassword = useCallback(async () => {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      Alert.alert('Security Error', `Password must be at least ${MIN_PASSWORD_LENGTH} characters long.`);
       return;
     }
 
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert(
-        'Security Update',
-        'Your credentials have been encrypted and rotated.'
-      );
+      Alert.alert('Success', 'Your password has been updated.');
       setIsChangingPassword(false);
       setNewPassword('');
-    } catch (err: unknown) {
-      Alert.alert('Auth Error', err instanceof Error ? err.message : 'Unknown error');
+    } catch (error) {
+      Alert.alert('Update Failed', error instanceof Error ? error.message : 'Unknown error occurred.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [newPassword, setLoading]);
 
-  /**
-   * MODULE 6: SESSION GUARD
-   * Description: Ends the encrypted session with tactile warning.
-   */
-  const handleSignOut = () => {
+  const handleSignOut = useCallback(() => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     Alert.alert(
       'Secure Logout',
-      'Are you sure you want to end your secure session? Local data will be locked.',
+      'Are you sure you want to end your secure session?',
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
+            // Implement actual sign out logic here
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           },
         },
       ]
     );
-  };
-
-  /**
-   * MODULE 7: STYLING ORCHESTRATION
-   * Logic: Memoized styles ensure 60FPS transitions during theme swaps.
-   */
-  const cardStyle = useMemo(
-    () => [
-      styles.glassCard,
-      {
-        backgroundColor: isDark
-          ? 'rgba(30, 41, 59, 0.7)'
-          : 'rgba(255, 255, 255, 0.85)',
-        borderColor: colors.border,
-      },
-      !isDark && shadows.medium, // This will now use the high-contrast light mode shadow
-    ],
-    [colors.border, isDark, shadows.medium]
-  );
-
-  // QR Logic: Strictly typed non-nullable link
-  const inviteLink = useMemo(
-    () =>
-      household?.id
-        ? `pantrypal://join/${household.id}`
-        : 'pantrypal://join/none',
-    [household?.id]
-  );
+  }, []);
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-      edges={['top']}
-    >
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scroll}
         stickyHeaderIndices={[1, 3, 5]}
       >
-        {/* SECTION 1: IDENTITY BENTO BOX */}
-        <Animated.View entering={FadeInDown.delay(100)} style={cardStyle}>
-          <View style={styles.profileHeader}>
-            <TouchableOpacity
-              onPress={handlePickAvatar}
-              style={styles.avatarWrapper}
-              disabled={isUploading}
-            >
-              <Image
-                source={{
-                  uri:
-                    localAvatar ||
-                    profile?.avatar_url ||
-                    `https://ui-avatars.com/api/?name=${profile?.full_name || 'U'
-                    }&background=6366F1&color=fff`,
-                }}
-                style={[styles.avatar, isUploading && { opacity: 0.5 }]}
-              />
-              {isUploading && (
-                <View style={styles.avatarLoader}>
-                  <ActivityIndicator color={colors.primary} />
-                </View>
-              )}
-              <View
-                style={[styles.editBadge, { backgroundColor: colors.primary }]}
-              >
-                <Feather name="camera" size={12} color="white" />
-              </View>
-            </TouchableOpacity>
+        <ProfileSection
+          profile={profile}
+          user={user}
+          colors={colors}
+          shadows={shadows}
+          isDark={isDark}
+          isEditing={isEditing}
+          setIsEditing={setIsEditing}
+          newName={newName}
+          setNewName={setNewName}
+          loading={loading}
+          setLoading={setLoading}
+          isUploading={isUploading}
+          localAvatar={localAvatar}
+          handlePickAvatar={handlePickAvatar}
+          handleUpdateProfile={handleUpdateProfile} refreshMetadata={function (): void {
+            throw new Error('Function not implemented.');
+          } }        />
 
-            <View style={styles.profileInfo}>
-              <Text style={[styles.name, { color: colors.text }]}>
-                {profile?.full_name || 'Chef Member'}
-              </Text>
-              <Text style={[styles.email, { color: colors.textSecondary }]}>
-                {user?.email}
-              </Text>
-              <View
-                style={[
-                  styles.tierBadge,
-                  { backgroundColor: colors.primary + '20' },
-                ]}
-              >
-                <MaterialCommunityIcons
-                  name="star-circle"
-                  size={10}
-                  color={colors.primary}
-                />
-                <Text style={[styles.tierText, { color: colors.primary }]}>
-                  {profile?.tier?.toUpperCase() || 'FREE TIER'}
-                </Text>
-              </View>
-            </View>
-
-            <TouchableOpacity
-              onPress={() => {
-                Haptics.selectionAsync();
-                setIsEditing(!isEditing);
-              }}
-              style={styles.actionBtn}
-            >
-              <Feather
-                name={isEditing ? 'chevron-up' : 'edit-3'}
-                size={20}
-                color={colors.textSecondary}
-              />
-            </TouchableOpacity>
-          </View>
-
-          {isEditing && (
-            <Animated.View
-              entering={FadeInUp}
-              layout={Layout.springify()}
-              style={styles.editPanel}
-            >
-              <View
-                style={[
-                  styles.inputBox,
-                  {
-                    backgroundColor: colors.background,
-                    borderColor: colors.border,
-                  },
-                ]}
-              >
-                <Feather
-                  name="user"
-                  size={16}
-                  color={colors.textSecondary}
-                  style={{ marginRight: 12 }}
-                />
-                <TextInput
-                  value={newName}
-                  onChangeText={setNewName}
-                  style={[styles.input, { color: colors.text }]}
-                  placeholder="Update Full Name"
-                  placeholderTextColor={colors.textSecondary}
-                  autoCorrect={false}
-                />
-              </View>
-              <TouchableOpacity
-                style={[
-                  styles.saveBtn,
-                  { backgroundColor: colors.primary },
-                  shadows.small,
-                ]}
-                onPress={handleUpdateProfile}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.saveBtnText}>Save Changes</Text>
-                )}
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </Animated.View>
-
-        {/* SECTION 2: HOUSEHOLD COLLABORATION */}
         <View style={styles.headerSpacer} />
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-          HOUSEHOLD SYNC ENGINE
-        </Text>
-        <View style={cardStyle}>
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => {
-              setShowQR(!showQR);
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            }}
-          >
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#8B5CF620' }]}>
-                <MaterialCommunityIcons
-                  name="home-group"
-                  size={22}
-                  color="#8B5CF6"
-                />
-              </View>
-              <View>
-                <Text style={[styles.rowLabel, { color: colors.text }]}>
-                  {household?.name || 'Primary Kitchen'}
-                </Text>
-                <Text
-                  style={[styles.rowSubLabel, { color: colors.textSecondary }]}
-                >
-                  Tap to reveal invite QR for sync
-                </Text>
-              </View>
-            </View>
-            <Feather
-              name={showQR ? 'chevron-up' : 'share'}
-              size={20}
-              color={colors.primary}
-            />
-          </TouchableOpacity>
+        <HouseholdSection household={household} colors={colors} shadows={shadows} isDark={isDark} />
 
-          {showQR && (
-            <Animated.View
-              entering={FadeInUp}
-              layout={Layout.springify()}
-              style={styles.qrContainer}
-            >
-              <View style={[styles.qrWrapper, shadows.medium]}>
-                <QRCode value={inviteLink} size={160} backgroundColor="white" />
-              </View>
-              <Text style={[styles.qrHint, { color: colors.textSecondary }]}>
-                Synchronize your pantry across multiple devices in real-time.
-              </Text>
-            </Animated.View>
-          )}
-        </View>
-
-        {/* SECTION 3: SYSTEM PREFERENCES & HARDWARE */}
         <View style={styles.headerSpacer} />
-        <Text style={[styles.sectionTitle, { color: colors.textSecondary }]}>
-          SYSTEM ARCHITECTURE
-        </Text>
-        <View style={cardStyle}>
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View
-                style={[
-                  styles.iconBox,
-                  { backgroundColor: isDark ? '#334155' : '#F1F5F9' },
-                ]}
-              >
-                <Feather
-                  name={isDark ? 'moon' : 'sun'}
-                  size={18}
-                  color={isDark ? '#94A3B8' : '#64748B'}
-                />
-              </View>
-              <Text style={[styles.rowLabel, { color: colors.text }]}>
-                Dark Appearance
-              </Text>
-            </View>
-            <Switch
-              value={isDark}
-              onValueChange={() => {
-                Haptics.selectionAsync();
-                toggleTheme();
-              }}
-              trackColor={{ true: colors.primary, false: '#CBD5E1' }}
-            />
-          </View>
+        <PreferencesSection
+          colors={colors}
+          shadows={shadows}
+          isDark={isDark}
+          toggleTheme={toggleTheme}
+          bioEnabled={bioEnabled}
+          handleBiometricToggle={handleBiometricToggle}
+          setIsChangingPassword={setIsChangingPassword}
+        />
 
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.row}>
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#10B98120' }]}>
-                <Feather name="shield" size={18} color="#10B981" />
-              </View>
-              <Text style={[styles.rowLabel, { color: colors.text }]}>
-                Biometric Security
-              </Text>
-            </View>
-            <Switch
-              value={bioEnabled}
-              onValueChange={handleBiometricToggle}
-              trackColor={{ true: '#10B981' }}
-            />
-          </View>
-
-          <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <TouchableOpacity
-            style={styles.row}
-            onPress={() => setIsChangingPassword(true)}
-          >
-            <View style={styles.rowLeft}>
-              <View style={[styles.iconBox, { backgroundColor: '#F59E0B20' }]}>
-                <Feather name="lock" size={18} color="#F59E0B" />
-              </View>
-              <Text style={[styles.rowLabel, { color: colors.text }]}>
-                Update Password
-              </Text>
-            </View>
-            <Feather
-              name="chevron-right"
-              size={18}
-              color={colors.textSecondary}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* SECTION 4: DANGER ZONE */}
         <View style={styles.headerSpacer} />
         <TouchableOpacity
-          style={[
-            styles.logoutBtn,
-            {
-              backgroundColor: colors.error + '10',
-              borderColor: colors.error + '30',
-            },
-          ]}
+          style={[styles.logoutBtn, { backgroundColor: colors.error + '10', borderColor: colors.error + '30' }]}
           onPress={handleSignOut}
         >
           <Feather name="power" size={18} color={colors.error} />
-          <Text style={[styles.logoutText, { color: colors.error }]}>
-            End Secure Session
-          </Text>
+          <Text style={[styles.logoutText, { color: colors.error }]}>End Secure Session</Text>
         </TouchableOpacity>
 
-        {/* FOOTER METADATA */}
         <View style={styles.footer}>
           <Text style={[styles.footerText, { color: colors.textSecondary }]}>
             Pantry Pal Enterprise • v2026.1.10{'\n'}
@@ -555,30 +567,17 @@ export default function SettingsScreen() {
         <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* SECURITY OVERLAY: PASSWORD ROTATION */}
       <Modal visible={isChangingPassword} transparent animationType="fade">
-        <BlurView
-          intensity={80}
-          tint={isDark ? 'dark' : 'light'}
-          style={styles.modalOverlay}
-        >
+        <BlurView intensity={80} tint={isDark ? 'dark' : 'light'} style={styles.modalOverlay}>
           <Animated.View
             entering={FadeInUp}
-            style={[
-              styles.modalContent,
-              { backgroundColor: colors.surface, borderColor: colors.border },
-              shadows.large,
-            ]}
+            style={[styles.modalContent, { backgroundColor: colors.surface, borderColor: colors.border }, shadows.large]}
           >
             <View style={styles.modalHeader}>
-              <View
-                style={[styles.modalIcon, { backgroundColor: '#F59E0B20' }]}
-              >
+              <View style={[styles.modalIcon, { backgroundColor: '#F59E0B20' }]}>
                 <Feather name="shield" size={24} color="#F59E0B" />
               </View>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
-                Rotate Credentials
-              </Text>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Rotate Credentials</Text>
               <Text style={[styles.modalSub, { color: colors.textSecondary }]}>
                 Updating your password will require a new biometric link.
               </Text>
@@ -586,10 +585,7 @@ export default function SettingsScreen() {
 
             <TextInput
               secureTextEntry
-              style={[
-                styles.modalInput,
-                { color: colors.text, borderColor: colors.border },
-              ]}
+              style={[styles.modalInput, { color: colors.text, borderColor: colors.border }]}
               placeholder="New Secure Password"
               placeholderTextColor={colors.textSecondary}
               value={newPassword}
@@ -598,29 +594,15 @@ export default function SettingsScreen() {
             />
 
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                onPress={() => setIsChangingPassword(false)}
-                style={styles.cancelBtn}
-              >
-                <Text
-                  style={{ color: colors.textSecondary, fontWeight: '600' }}
-                >
-                  Cancel
-                </Text>
+              <TouchableOpacity onPress={() => setIsChangingPassword(false)} style={styles.cancelBtn}>
+                <Text style={{ color: colors.textSecondary, fontWeight: '600' }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleUpdatePassword}
-                style={[
-                  styles.modalSaveBtn,
-                  { backgroundColor: colors.primary },
-                ]}
+                style={[styles.modalSaveBtn, { backgroundColor: colors.primary }]}
                 disabled={loading}
               >
-                {loading ? (
-                  <ActivityIndicator color="white" />
-                ) : (
-                  <Text style={styles.modalSaveText}>Confirm</Text>
-                )}
+                {loading ? <ActivityIndicator color="white" /> : <Text style={styles.modalSaveText}>Confirm</Text>}
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -630,7 +612,7 @@ export default function SettingsScreen() {
   );
 }
 
-// --- MODULE 8: MASTER STYLESHEET ---
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { padding: 24 },
@@ -643,13 +625,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   profileHeader: { flexDirection: 'row', alignItems: 'center' },
-  avatarWrapper: { position: 'relative', width: 84, height: 84 },
-  avatar: {
-    width: 84,
-    height: 84,
-    borderRadius: 30,
-    backgroundColor: '#E2E8F0',
-  },
+  avatarWrapper: { position: 'relative', width: AVATAR_SIZE, height: AVATAR_SIZE },
+  avatar: { width: AVATAR_SIZE, height: AVATAR_SIZE, borderRadius: 30, backgroundColor: '#E2E8F0' },
   avatarLoader: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
