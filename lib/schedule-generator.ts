@@ -2,7 +2,7 @@ function addMinutes(date: Date, minutes: number): Date {
   return new Date(date.getTime() + minutes * 60000);
 }
 
-function format(date: Date, formatStr: string): string {
+function format(date: Date, _formatStr: string): string {
   // Only supports 'h:mm a' format for this use case
   let hours = date.getHours();
   const minutes = date.getMinutes();

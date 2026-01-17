@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { BlurView } from 'expo-blur';
-import { supabase } from '@/services/supabase';
+import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Feather } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -116,7 +116,7 @@ export function FridgeScanner({ visible, onClose, onItemsAdded }: FridgeScannerP
     } finally {
       setAnalyzing(false);
     }
-  }, [analyzing, onClose, onItemsAdded, processImage, saveItemsToDB]);
+  }, [analyzing, household, onClose, onItemsAdded, processImage, saveItemsToDB, user]);
 
   return (
     <Modal visible={visible} animationType="slide">

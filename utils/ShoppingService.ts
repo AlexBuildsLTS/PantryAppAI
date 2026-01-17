@@ -30,9 +30,14 @@ export class ShoppingService {
         activeList = data;
       }
 
-      // 3. Batch insert items
+
+      // Ensure activeList.id is present and is a string
+      if (!activeList?.id) {
+        throw new Error('Active shopping list ID is missing.');
+      }
+
       const inserts = items.map((name) => ({
-        list_id: activeList?.id,
+        list_id: activeList.id as string,
         name: name,
         quantity: 1,
         is_bought: false,

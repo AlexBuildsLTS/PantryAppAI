@@ -151,7 +151,7 @@ export default function AdminUsersScreen() {
     };
 
     // Edit (placeholder)
-    const handleEdit = (user: any) => {
+    const handleEdit = (_user: any) => {
         Alert.alert('Edit User', 'Edit modal coming soon.');
     };
 
